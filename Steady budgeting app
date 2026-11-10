@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Steady — money, without the noise</title>
+<style>
+  /* Registered so the page background can ease between moods (gradients can't
+     transition, but typed colour properties can). Browsers without @property
+     simply switch instantly. */
+  @property --bg-top{ syntax:'<color>'; inherits:true; initial-value:#EDEEEC; }
+  @property --bg-bottom{ syntax:'<color>'; inherits:true; initial-value:#E1E2DE; }
+  :root{ transition: --bg-top 1.2s ease, --bg-bottom 1.2s ease; }
+
+  :root{
+    /* ---- neutral surfaces ---- */
+    --paper: #F6F5F2;
+    --paper-dim: #ECEAE5;
+    --ink: #262A2E;
+    --ink-soft: #6D7278;
+    --mist: #DEDDD7;
+    --line: #D6D4CD;
+
+    /* ---- money-mood states (plain colors only — no color-mix, for max browser support) ---- */
+    --clear: #5D8AA8;
+    --clear-soft: #D9E5EC;
+    --clear-tint: #B7D2E1;
+    --clear-shadow: rgba(93,138,168,0.45);
+
+    --hazy: #CD9A45;
+    --hazy-soft: #F0E1C4;
+    --hazy-tint: #E7CA98;
+    --hazy-shadow: rgba(205,154,69,0.45);
+
+    --stormy: #BC6B6B;
+    --stormy-soft: #EDD6D6;
+    --stormy-tint: #DDACAC;
+    --stormy-shadow: rgba(188,107,107,0.45);
+
+    /* page tint behind the phone for each mood */
+    --clear-bg: #EDEEEC;
+    --hazy-bg: #F2EEE2;
+    --stormy-bg: #EBE3E3;
+
+    /* current mood — swapped by JS */
+    --state-color: var(--clear);
+    --state-soft: var(--clear-soft);
+    --state-tint: var(--clear-tint);
+    --state-shadow: var(--clear-shadow);
+    --bg-top: var(--clear-bg);
+    --bg-bottom: #E1E2DE;
+
+    --display: 'Fraunces', Georgia, serif;
+    --body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  *{ box-sizing: border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+    font-family: var(--body);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding: 28px 12px;
+  }
+
+  .phone{
+    width: 100%;
+    max-width: 400px;
+    height: 800px;
+    max-height: 92vh;
+    background: var(--paper);
+    border-radius: 34px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.6) inset,
+      0 30px 60px -20px rgba(40,35,25,0.35),
+      0 8px 20px -8px rgba(40,35,25,0.25);
+    overflow: hidden;
+    position: relative;
+    display:flex;
+    flex-direction:column;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .screens{ flex: 1; position: relative; overflow: hidden; }
+
+  .screen{
+    position:absolute;
+    inset:0;
+    padding: 30px 26px 20px;
+    display:flex;
+    flex-direction:column;
+    opacity:0;
+    transform: translateY(10px) scale(0.98);
+    pointer-events:none;
+    transition: opacity 420ms ease, transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow-y:auto;
+  }
+  .screen.active{ opacity:1; transform: translateY(0) scale(1); pointer-events:auto; }
+
+  /* ---------- Shared type ---------- */
+  h1,h2,h3{ font-family: var(--display); font-weight: 500; margin:0; }
+  p{ margin:0; line-height:1.5; }
+  .num{ font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Bottom nav ---------- */
+  .nav{
+    display:flex;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+    padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .nav button{
+    position:relative;
+    flex:1;
+    background:none;
+    border:none;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:5px;
+    padding:6px 0;
+    cursor:pointer;
+    color: var(--ink-soft);
+    font-family: var(--body);
+    font-size:11.5px;
+    letter-spacing:0.02em;
+    border-radius:12px;
+    transition: color 200ms ease;
+  }
+  .nav button svg{ width:20px; height:20px; stroke: var(--ink-soft); transition: stroke 200ms ease; fill:none; stroke-width:1.6; }
+  .nav button.active{ color: var(--ink); }
+  .nav button.active svg{ stroke: var(--state-color); }
+  .nav button:focus-visible{ outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* ================= TODAY ================= */
+  .today-top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .greeting{ font-size: 22px; }
+  .date{ font-size:12.5px; color: var(--ink-soft); margin-top:2px; }
+  .today-top-right{ display:flex; align-items:center; gap:8px; }
+  .eyebrow{
+    font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 600;
+  }
+  .help-btn{
+    width:22px; height:22px; border-radius:50%;
+    border:1px solid var(--line); background: var(--paper);
+    color: var(--ink-soft); font-family: var(--body); font-size:12px; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition: all 180ms ease; padding:0;
+  }
+  .help-btn:hover{ border-color: var(--state-color); color: var(--ink); }
+  .help-btn:focus-visible{ outline: 2px solid var(--ink); outline-offset:2px; }
+
+  .orb-wrap{
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap: 22px; position:relative;
+  }
+
+  .orb-stage{
+    position:relative; width: 230px; height: 230px;
+  }
+  /* The goo filter melts the orb and its droplets together like liquid. It lives
+     on its own layer so the glow, the pulse ring and the focus ring stay crisp
+     (a threshold filter would erase soft or thin shapes). */
+  .orb-goo{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    filter: url('#goo');
+  }
+  .orb-glow{
+    position:absolute; left:31px; top:31px; width:168px; height:168px; border-radius:50%;
+    box-shadow: 0 20px 45px -12px var(--state-shadow);
+    animation: breathe 5200ms ease-in-out infinite;
+    transition: box-shadow 900ms ease;
+  }
+  .orb-focus{
+    position:absolute; left:23px; top:23px; width:184px; height:184px; border-radius:50%;
+    border:3px solid var(--ink); opacity:0; pointer-events:none; transition: opacity 160ms ease;
+  }
+  .orb-stage.orb-focused .orb-focus{ opacity:1; }
+
+  .mote{
+    position:absolute; border-radius:50%; background: var(--state-tint);
+    animation: drift 9s ease-in-out infinite;
+    transition: background 900ms ease;
+  }
+
+  .orb{
+    width: 168px; height: 168px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--state-tint), var(--state-color) 70%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset;
+    animation: breathe 5200ms ease-in-out infinite;
+    transition: background 900ms ease;
+    cursor:pointer;
+    border:none;
+  }
+  .orb:focus-visible{ outline:none; }   /* the ring is drawn outside the filter (.orb-focus) */
+
+  @keyframes breathe{
+    0%,100%{ transform: scale(1); border-radius: 50%; }
+    50%{ transform: scale(1.055); border-radius: 48% 52% 51% 49% / 49% 51% 48% 52%; }
+  }
+  @keyframes drift{ 0%{ transform: translate(0,0); } 50%{ transform: translate(6px,-10px); } 100%{ transform: translate(0,0); } }
+
+  .state-copy{ text-align:center; display:flex; flex-direction:column; gap:8px; max-width: 260px; }
+  .state-headline{ font-size: 21px; font-family: var(--display); }
+  .state-sub{ font-size: 13.5px; color: var(--ink-soft); line-height:1.5; }
+
+  .reveal-btn{
+    background: none; border: 1px solid var(--line); color: var(--ink-soft);
+    font-family: var(--body); font-size: 12.5px; padding: 9px 16px;
+    border-radius: 100px; cursor:pointer; transition: all 200ms ease;
+  }
+  .reveal-btn:hover{ border-color: var(--state-color); color: var(--ink); }
+  .reveal-btn:focus-visible{ outline: 2px solid var(--ink); outline-offset:2px; }
+
+  .number-panel{ min-height: 20px; display:flex; flex-direction:column; gap:4px; align-items:center; justify-content:center; }
+  .number-value{
+    font-family: var(--mono); font-size: 26px; letter-spacing:0.01em;
+    opacity:0; transform: translateY(4px);
+    transition: opacity 380ms ease, transform 380ms ease;
+  }
+  .number-value.show{ opacity:1; transform: translateY(0); }
+
+  .cta-row{ display:flex; justify-content:center; align-items:center; gap:10px; padding: 6px 0 4px; }
+  .log-cta{
+    display:flex; align-items:center; gap:8px;
+    background: var(--ink); color: var(--paper); border:none;
+    padding: 13px 22px; border-radius: 100px;
+    font-family: var(--body); font-size: 14px; font-weight: 600; cursor:pointer;
+    box-shadow: 0 10px 20px -8px rgba(0,0,0,0.35);
+    transition: transform 160ms ease;
+  }
+  .log-cta:hover{ transform: translateY(-1px); }
+  .log-cta:focus-visible{ outline: 2px solid var(--ink); outline-offset:3px; }
+  .log-cta svg{ width:16px; height:16px; stroke: var(--paper); fill:none; stroke-width:2; }
+
+  /* ================= LOG ================= */
+  .log-header{ margin-bottom: 18px; }
+  .log-header h2{ font-size:22px; }
+  .log-header p{ font-size:13px; color:var(--ink-soft); margin-top:4px; }
+
+  .cat-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
+  .cat-btn{
+    background: var(--paper-dim); border: 1px solid transparent; border-radius: 18px;
+    padding: 16px 8px; display:flex; flex-direction:column; align-items:center; gap:8px;
+    cursor:pointer; color: var(--ink); font-family: var(--body); font-size: 12px;
+    transition: all 180ms ease;
+  }
+  .cat-btn svg{ width:22px; height:22px; stroke: var(--ink-soft); fill:none; stroke-width:1.6; transition: stroke 180ms ease; }
+  .cat-btn:hover{ background: var(--mist); }
+  .cat-btn.selected{ border-color: var(--state-color); background: var(--state-soft); }
+  .cat-btn.selected svg{ stroke: var(--ink); }
+  .cat-btn:focus-visible{ outline: 2px solid var(--ink); outline-offset:2px; }
+
+  .amount-section{
+    margin-top: 26px; opacity:0; max-height:0; overflow:hidden;
+    transition: opacity 320ms ease, max-height 320ms ease;
+  }
+  .amount-section.open{ opacity:1; max-height:160px; }
+  .field-tip{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; }
+
+  .exact-input{
+    width:100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 15px; background: var(--paper); color: var(--ink);
+  }
+  .exact-input:focus{ outline: none; border-color: var(--state-color); }
+
+  .save-row{ margin-top: auto; padding-top: 20px; }
+  .save-btn{
+    width:100%; background: var(--ink); color: var(--paper); border:none;
+    padding: 15px; border-radius: 16px; font-family: var(--body);
+    font-size: 14.5px; font-weight:600; cursor:pointer;
+    opacity: 0.4; pointer-events:none;
+    transition: opacity 200ms ease, transform 160ms ease;
+  }
+  .save-btn.ready{ opacity:1; pointer-events:auto; }
+  .save-btn:hover.ready{ transform: translateY(-1px); }
+  .save-btn:focus-visible{ outline: 2px solid var(--paper); outline-offset: -4px; }
+
+  .toast{
+    position:absolute; left:26px; right:26px; bottom: 94px;
+    background: var(--ink); color: var(--paper);
+    padding: 13px 16px; border-radius: 14px; font-size: 13px; text-align:center;
+    transform: translateY(12px); opacity:0;
+    transition: all 320ms ease; pointer-events:none; z-index:5;
+  }
+  .toast.show{ transform: translateY(0); opacity:1; }
+
+  /* ================= REFLECT ================= */
+  .reflect-header h2{ font-size:22px; }
+  .reflect-header p{ font-size:13px; color:var(--ink-soft); margin-top:4px; }
+
+  .week-card{ margin-top: 22px; background: var(--paper-dim); border-radius: 22px; padding: 22px 20px 18px; }
+  .week-line{ font-size: 14.5px; line-height:1.55; margin-bottom:18px; }
+  .week-line strong{ font-family: var(--display); font-weight:600; }
+
+  .bars{ display:flex; align-items:flex-end; gap: 10px; height: 110px; }
+  .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:8px; }
+  .bar{ width: 100%; max-width: 26px; border-radius: 8px 8px 4px 4px; background: var(--mist); transition: height 700ms cubic-bezier(.2,.8,.2,1), background 500ms ease; }
+  .bar.today{ background: var(--state-color); }
+  .bar-day{ font-size:10.5px; color: var(--ink-soft); }
+  .bar-num{ font-family: var(--mono); font-size: 10px; color: var(--ink-soft); opacity:0; transition: opacity 300ms ease; height:12px; }
+  .bar-num.show{ opacity:1; }
+
+  .details-toggle{
+    display:block; margin: 18px auto 0; background:none; border:none;
+    color: var(--ink-soft); font-size: 12px; text-decoration: underline;
+    text-underline-offset:3px; cursor:pointer; font-family: var(--body);
+  }
+
+  .insight-card{
+    margin-top:14px; display:flex; gap:12px; background: var(--paper);
+    border: 1px solid var(--line); border-radius:18px; padding: 16px 16px; align-items:flex-start;
+  }
+  .insight-card svg{ width:18px; height:18px; stroke: var(--state-color); fill:none; stroke-width:1.7; flex-shrink:0; margin-top:2px; }
+  .insight-card p{ font-size:13px; line-height:1.5; }
+
+  .breath-link{ margin-top: 20px; text-align:center; }
+  .breath-link button{
+    background:none; border:1px solid var(--line); padding: 11px 20px; border-radius:100px;
+    font-family: var(--body); font-size:12.5px; color: var(--ink-soft); cursor:pointer; transition: all 180ms ease;
+  }
+  .breath-link button:hover{ border-color: var(--state-color); color:var(--ink); }
+
+  /* ================= BUDGET ================= */
+  .budget-header h2{ font-size:22px; }
+  .budget-header p{ font-size:13px; color:var(--ink-soft); margin-top:4px; }
+
+  .field-block{ margin-top: 26px; }
+  .field-label{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; }
+
+  .currency-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .currency-chip{
+    padding: 9px 14px; border-radius: 100px; border: 1px solid var(--line); background: var(--paper);
+    font-family: var(--body); font-size: 12.5px; color: var(--ink);
+    display:flex; align-items:center; gap:6px; cursor:pointer; transition: all 180ms ease;
+  }
+  .currency-chip .sym{ font-family: var(--mono); font-size:12px; }
+  .currency-chip:hover{ border-color: var(--state-color); }
+  .currency-chip.selected{ background: var(--state-soft); border-color: var(--state-color); }
+
+  .period-row{ display:flex; gap:8px; }
+  .period-btn{
+    flex:1; padding: 11px 6px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--paper); font-family: var(--body); font-size: 13px; color: var(--ink);
+    cursor:pointer; transition: all 180ms ease;
+  }
+  .period-btn:hover{ border-color: var(--state-color); }
+  .period-btn.selected{ background: var(--state-soft); border-color: var(--state-color); }
+
+  .current-budget-card{
+    margin-top: 10px; background: var(--paper-dim); border-radius: 18px;
+    padding: 18px 18px; text-align:center;
+  }
+  .current-budget-label{ font-size:12px; color:var(--ink-soft); }
+  .current-budget-value{
+    font-family: var(--mono);
+    font-size: clamp(22px, 6vw, 30px);
+    margin: 6px 0 4px;
+    color: var(--ink);
+  }
+  .current-budget-sub{ font-size: 11.5px; color: var(--ink-soft); }
+  .current-budget-sub.flex-line{ margin-top:6px; line-height:1.45; }
+  .current-budget-sub:empty{ display:none; }
+
+  .mode-row{ display:flex; gap:8px; margin-top: 14px; }
+  .mode-btn{
+    flex:1; padding: 11px 6px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--paper); font-family: var(--body); font-size: 12.5px; color: var(--ink);
+    cursor:pointer; transition: all 180ms ease;
+  }
+  .mode-btn:hover{ border-color: var(--state-color); }
+  .mode-btn.selected{ background: var(--state-soft); border-color: var(--state-color); font-weight:600; }
+
+  .stepper-card{
+    margin-top: 8px; background: var(--paper-dim); border-radius: 20px; padding: 22px 18px;
+    display:flex; flex-direction:column; align-items:center; gap: 14px;
+  }
+  .stepper-row{ display:flex; align-items:center; gap: 18px; }
+  .stepper-btn{
+    width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background: var(--paper);
+    font-size:18px; color: var(--ink); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition: all 160ms ease;
+  }
+  .stepper-btn:hover{ border-color: var(--state-color); background: var(--state-soft); }
+  .stepper-btn:active{ transform: scale(0.94); }
+  .stepper-value{ font-family: var(--mono); font-size: 28px; min-width: 130px; text-align:center; color: var(--ink); }
+  .stepper-hint{ font-size:11.5px; color: var(--ink-soft); text-align:center; }
+
+  .text-toggle{
+    margin-top: 14px; background:none; border:none; color: var(--ink-soft); font-size: 12px;
+    text-decoration: underline; text-underline-offset: 3px; cursor:pointer; padding:4px 0;
+    font-family: var(--body); align-self:center;
+  }
+  .exact-wrap{ margin-top: 4px; max-height:0; opacity:0; overflow:hidden; transition: all 280ms ease; width:100%; }
+  .exact-wrap.open{ max-height:70px; opacity:1; }
+
+  .budget-save-row{ margin-top: auto; padding-top: 22px; }
+
+  .recent-changes{ margin-top: 14px; max-height:0; opacity:0; overflow:hidden; transition: all 280ms ease; }
+  .recent-changes.open{ max-height: 260px; opacity:1; }
+  .change-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:12px; color: var(--ink-soft);
+    padding: 8px 2px; border-bottom: 1px solid var(--line);
+  }
+  .change-row:last-child{ border-bottom:none; }
+  .change-amount{ font-family: var(--mono); color: var(--ink); }
+  .change-date{ color: var(--ink-soft); }
+
+  .reset-zone{ text-align:center; margin-top:14px; }
+  .reset-confirm{ max-height:0; opacity:0; overflow:hidden; transition: all 280ms ease; margin-top: 10px; }
+  .reset-confirm.open{ max-height:140px; opacity:1; }
+  .reset-confirm-text{ font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  .reset-confirm-row{ display:flex; gap:10px; justify-content:center; }
+  .reset-cancel-btn, .reset-yes-btn{
+    padding: 9px 16px; border-radius: 100px; font-family: var(--body); font-size: 12.5px;
+    cursor:pointer; transition: all 180ms ease; border: 1px solid var(--line);
+  }
+  .reset-cancel-btn{ background: var(--paper); color: var(--ink); }
+  .reset-cancel-btn:hover{ border-color: var(--state-color); }
+  .reset-yes-btn{ background: var(--stormy); border-color: var(--stormy); color: var(--paper); }
+  .reset-yes-btn:hover{ opacity: 0.9; }
+
+  /* ================= TUTORIAL ================= */
+  .tutorial-overlay{
+    position:absolute; inset:0; z-index:50; border-radius: 34px; overflow:hidden;
+    background: var(--paper);
+    display:flex; flex-direction:column;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition: opacity 320ms ease, visibility 320ms ease;
+  }
+  .tutorial-overlay.open{ opacity:1; visibility:visible; pointer-events:auto; }
+
+  .tutorial-track{
+    flex:1; display:flex; width: 700%;
+    transition: transform 420ms cubic-bezier(.2,.8,.2,1);
+  }
+  .tutorial-slide{
+    width: calc(100% / 7); flex-shrink:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding: 40px 34px; gap: 22px;
+  }
+  .tutorial-illustration{ height:120px; display:flex; align-items:center; justify-content:center; }
+  .tutorial-title{ font-family: var(--display); font-size: 20px; }
+  .tutorial-text{ font-size: 13.5px; color: var(--ink-soft); line-height:1.55; max-width: 250px; }
+
+  /* -- slide 1: welcome orb -- */
+  .tut-orb{
+    width:90px; height:90px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, var(--clear-tint), var(--clear) 70%);
+    box-shadow: 0 14px 30px -10px var(--clear-shadow);
+    animation: breathe 5200ms ease-in-out infinite;
+  }
+
+  /* -- slide 2: today / tap to reveal -- */
+  .tut-today-demo{ position:relative; width:110px; height:110px; display:flex; align-items:center; justify-content:center; }
+  .tut-mini-orb{
+    width:64px; height:64px; border-radius:50%; position:relative; z-index:2;
+    background: radial-gradient(circle at 35% 30%, var(--clear-tint), var(--clear) 70%);
+    box-shadow: 0 10px 22px -8px var(--clear-shadow);
+    animation: breathe 5200ms ease-in-out infinite;
+  }
+  .tut-ripple{
+    position:absolute; width:64px; height:64px; border-radius:50%;
+    border:2px solid var(--clear); opacity:0;
+    animation: tutRipple 2600ms ease-out infinite;
+  }
+  @keyframes tutRipple{ 0%{ transform:scale(1); opacity:0.55; } 100%{ transform:scale(1.9); opacity:0; } }
+  .tut-number{
+    position:absolute; bottom:-8px; font-family: var(--mono); font-size:12.5px; color: var(--ink);
+    background: var(--paper); padding:3px 9px; border-radius:8px; opacity:0;
+    animation: tutFadeNum 3200ms ease-in-out infinite;
+  }
+  @keyframes tutFadeNum{
+    0%,45%{ opacity:0; transform:translateY(4px); }
+    55%,80%{ opacity:1; transform:translateY(0); }
+    95%,100%{ opacity:0; transform:translateY(4px); }
+  }
+
+  /* -- slide 3: log / categories -- */
+  .tut-cats{ display:flex; gap:14px; }
+  .tut-cat-dot{
+    width:34px; height:34px; border-radius:12px;
+    background: var(--paper-dim); border:1px solid var(--line);
+    animation: tutPulseCat 1800ms ease-in-out infinite;
+  }
+  .tut-cat-dot:nth-child(1){ animation-delay:0ms; }
+  .tut-cat-dot:nth-child(2){ animation-delay:200ms; }
+  .tut-cat-dot:nth-child(3){ animation-delay:400ms; }
+  @keyframes tutPulseCat{
+    0%,100%{ transform:scale(1); background:var(--paper-dim); border-color:var(--line); }
+    30%{ transform:scale(1.14); background:var(--clear-soft); border-color:var(--clear); }
+  }
+
+  /* -- slide 4: reflect / bars -- */
+  .tut-bars{ display:flex; align-items:flex-end; gap:9px; height:76px; }
+  .tut-bar{ width:13px; border-radius:6px 6px 3px 3px; background: var(--clear); animation: tutBarGrow 2400ms ease-in-out infinite; }
+  @keyframes tutBarGrow{ 0%,100%{ height:16%; } 50%{ height:var(--bar-h, 60%); } }
+
+  /* -- slide 5: budget / ticking total -- */
+  .tut-budget-demo{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .tut-tick-value{ font-family: var(--mono); font-size: 26px; color: var(--ink); }
+  .tut-plus-btn{
+    width:36px; height:36px; border-radius:50%; background: var(--clear); color: var(--paper);
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+    animation: tutPlusPulse 1400ms ease-in-out infinite;
+  }
+  @keyframes tutPlusPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.16); } }
+
+  /* -- controls -- */
+  .tutorial-controls{ padding: 0 26px 26px; display:flex; flex-direction:column; gap:16px; }
+  .tutorial-dots{ display:flex; justify-content:center; gap:8px; }
+  .tutorial-dot{
+    width:7px; height:7px; border-radius:50%; background: var(--mist); border:none; padding:0; cursor:pointer;
+    transition: all 220ms ease;
+  }
+  .tutorial-dot.active{ background: var(--clear); width:20px; border-radius:4px; }
+  .tutorial-dot:focus-visible{ outline: 2px solid var(--ink); outline-offset:3px; }
+
+  .tutorial-buttons{ display:flex; justify-content:space-between; align-items:center; }
+  .tutorial-skip{
+    background:none; border:none; color: var(--ink-soft); font-family: var(--body);
+    font-size: 13px; cursor:pointer; padding:8px;
+  }
+  .tutorial-skip:hover{ color: var(--ink); }
+  .tutorial-next{
+    background: var(--ink); color: var(--paper); border:none; padding: 12px 26px; border-radius: 100px;
+    font-family: var(--body); font-size: 14px; font-weight:600; cursor:pointer;
+    transition: transform 160ms ease;
+  }
+  .tutorial-next:hover{ transform: translateY(-1px); }
+  .tutorial-next:focus-visible{ outline: 2px solid var(--ink); outline-offset:3px; }
+
+  /* ================= SHARED SMALL CONTROLS ================= */
+  .text-input{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+    font-family: var(--body); font-size:14.5px; background: var(--paper); color: var(--ink);
+  }
+  .text-input:focus{ outline:none; border-color: var(--state-color); }
+  .pill-btn{
+    background: var(--paper); border:1px solid var(--line); color: var(--ink);
+    padding:10px 16px; border-radius:100px; font-family: var(--body); font-size:13px; cursor:pointer;
+    transition: all 180ms ease;
+  }
+  .pill-btn:hover{ border-color: var(--state-color); }
+  .pill-btn.solid{ background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight:600; }
+  .pill-btn.small{ padding:7px 12px; font-size:12.5px; }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .save-btn.compact{ padding:12px; font-size:13.5px; border-radius:14px; }
+  .inline-msg{ font-size:12.5px; color: var(--ink-soft); min-height:16px; line-height:1.45; }
+  .center-row{ text-align:center; }
+  .icon-btn{
+    width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background: var(--paper);
+    color: var(--ink-soft); cursor:pointer; font-size:15px; line-height:1; padding:0; flex-shrink:0;
+  }
+  .icon-btn:hover{ border-color: var(--stormy); color: var(--stormy); }
+  .pill-btn:focus-visible, .icon-btn:focus-visible, .freq-btn:focus-visible, .switch:focus-visible,
+  .jar-nudge:focus-visible, .breather-btn:focus-visible, .more-panel summary:focus-visible, .text-input:focus-visible{
+    outline: 2px solid var(--ink); outline-offset: 2px;
+  }
+
+  /* gentle press feedback — answers the tap, nothing more */
+  .cat-btn:active, .pill-btn:active, .currency-chip:active, .period-btn:active, .mode-btn:active,
+  .log-cta:active, .reveal-btn:active, .freq-btn:active, .jar-nudge:active, .breather-btn:active{ transform: scale(0.96); }
+  .nav button:active{ transform: scale(0.94); }
+  .save-btn.ready:active{ transform: scale(0.98); }
+
+  /* ================= TODAY ADDITIONS ================= */
+  .number-sub{ font-size:12px; color: var(--ink-soft); opacity:0; transition: opacity 380ms ease; text-align:center; }
+  .number-sub.show{ opacity:1; }
+  .number-sub:empty{ display:none; }
+
+  .orb-ring{
+    position:absolute; left:31px; top:31px; width:168px; height:168px; border-radius:50%;
+    border:2px solid var(--state-color); opacity:0; pointer-events:none;
+  }
+  .orb-ring.pulse{ animation: ringOut 1100ms ease-out 1; }
+  @keyframes ringOut{ 0%{ transform:scale(1); opacity:0.5; } 100%{ transform:scale(1.7); opacity:0; } }
+
+  .jar-nudge{
+    display:none; align-items:center; gap:8px; background: var(--hazy-soft); border:1px solid var(--hazy);
+    color: var(--ink); border-radius:100px; padding:8px 14px; font-family: var(--body); font-size:12.5px; cursor:pointer;
+    transition: transform 160ms ease;
+  }
+  .jar-nudge.show{ display:inline-flex; }
+
+  .breather-btn{
+    width:46px; height:46px; border-radius:50%; border:1px solid var(--line); background: var(--paper);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+    transition: all 180ms ease;
+  }
+  .breather-btn svg{ width:20px; height:20px; stroke: var(--ink-soft); fill:none; stroke-width:1.6; }
+  .breather-btn:hover{ border-color: var(--state-color); }
+
+  .nav-dot{
+    position:absolute; top:3px; left:calc(50% + 7px); width:8px; height:8px; border-radius:50%;
+    background: var(--hazy); border:2px solid var(--paper); box-sizing:content-box; display:none;
+  }
+  .nav-dot.show{ display:block; }
+
+  /* ================= BUDGET ADDITIONS ================= */
+  .more-panel{ margin-top:14px; border:1px solid var(--line); border-radius:18px; background: var(--paper); }
+  .more-panel summary{
+    list-style:none; cursor:pointer; padding:14px 16px; display:flex; align-items:center; gap:10px;
+    font-size:14px; font-weight:600;
+  }
+  .more-panel summary::-webkit-details-marker{ display:none; }
+  .more-panel summary .panel-hint{ margin-left:auto; font-weight:400; font-size:12px; color: var(--ink-soft); }
+  .more-panel summary::after{ content:'+'; font-family: var(--mono); color: var(--ink-soft); }
+  .more-panel[open] summary::after{ content:'\2013'; }
+  .more-panel .panel-body{ padding:0 16px 16px; display:flex; flex-direction:column; gap:12px; }
+  .panel-note{ font-size:12.5px; color: var(--ink-soft); line-height:1.5; }
+
+  .fixed-list{ display:flex; flex-direction:column; }
+  .fixed-row{ display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); font-size:13.5px; }
+  .fixed-row:last-child{ border-bottom:none; }
+  .fixed-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fixed-amt{ font-family: var(--mono); font-size:12.5px; color: var(--ink-soft); white-space:nowrap; }
+  .preset-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .fixed-form-row{ display:flex; gap:10px; align-items:center; }
+  .fixed-form-row .exact-input{ flex:1; min-width:0; }
+  .freq-row{ display:flex; gap:6px; }
+  .freq-btn{
+    padding:10px 12px; border-radius:12px; border:1px solid var(--line); background: var(--paper);
+    font-family: var(--body); font-size:12.5px; cursor:pointer; color: var(--ink); transition: all 180ms ease;
+  }
+  .freq-btn.selected{ background: var(--state-soft); border-color: var(--state-color); font-weight:600; }
+
+  .setting-row{
+    margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:14px 16px; border:1px solid var(--line); border-radius:18px;
+  }
+  .setting-title{ font-size:14px; font-weight:600; }
+  .setting-sub{ font-size:12px; color: var(--ink-soft); margin-top:2px; line-height:1.4; }
+  .switch{
+    position:relative; flex-shrink:0; width:46px; height:28px; border-radius:100px; border:none;
+    background: var(--mist); cursor:pointer; padding:0; transition: background 200ms ease;
+  }
+  .switch .knob{
+    position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background: var(--paper);
+    box-shadow:0 1px 3px rgba(0,0,0,0.25); transition: transform 200ms ease;
+  }
+  .switch[aria-checked="true"]{ background: var(--state-color); }
+  .switch[aria-checked="true"] .knob{ transform: translateX(18px); }
+
+  .paste-area{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+    font-family: var(--mono); font-size:12px; background: var(--paper); color: var(--ink); resize:vertical;
+  }
+  .paste-area.hidden-area{ display:none; }
+  .paste-area.hidden-area.open{ display:block; }
+  .restore-confirm{ display:none; background: var(--paper-dim); border-radius:14px; padding:12px 14px; font-size:12.5px; line-height:1.5; }
+  .restore-confirm.open{ display:block; }
+  .restore-confirm .btn-row{ margin-top:10px; }
+  .sub-label{ font-size:12.5px; color: var(--ink-soft); font-weight:600; margin-top:4px; }
+
+  /* ================= JAR ================= */
+  .jar-stage{ display:flex; justify-content:center; margin: 0 0 10px; }
+  .jar-svg{ width:150px; height:140px; }
+  .jar-lid{ fill: var(--line); }
+  .jar-body{ fill: var(--paper-dim); fill-opacity:0.7; stroke: var(--line); stroke-width:2; }
+  .pebble{ fill: var(--clear); animation: pebbleBob 4s ease-in-out infinite; }
+  .pebble.ready{ fill: var(--hazy); }
+  @keyframes pebbleBob{ 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-2px); } }
+  .jar-ready{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+  .jar-card{ background: var(--hazy-soft); border:1px solid var(--hazy); border-radius:18px; padding:16px; }
+  .jar-card-name{ font-family: var(--display); font-size:17px; overflow-wrap:anywhere; }
+  .jar-card-q{ font-size:13px; color: var(--ink-soft); margin: 4px 0 12px; }
+  .jar-card-amt{ font-family: var(--mono); font-size:12.5px; color: var(--ink); margin-bottom:10px; }
+  .jar-form{ display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .jar-list-head{ display:flex; justify-content:space-between; align-items:center; margin-top:22px; font-size:12.5px; color: var(--ink-soft); }
+  .jar-list-head .text-toggle{ margin-top:0; }
+  .jar-item{ padding:12px 2px; border-bottom:1px solid var(--line); }
+  .jar-item:last-child{ border-bottom:none; }
+  .jar-item-top{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .jar-item-name{ font-size:14px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .jar-item-time{ font-size:12px; color: var(--ink-soft); white-space:nowrap; }
+  .jar-bar{ height:4px; border-radius:4px; background: var(--mist); margin-top:8px; overflow:hidden; }
+  .jar-bar span{ display:block; height:100%; background: var(--clear); border-radius:4px; }
+  .jar-item-extra{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color: var(--ink-soft); }
+  .jar-item-extra .text-toggle{ margin-top:0; }
+  .jar-empty{ font-size:13px; color: var(--ink-soft); padding:10px 0; line-height:1.5; }
+  .jar-tally{ margin-top:18px; font-size:13px; color: var(--ink-soft); text-align:center; line-height:1.5; }
+  .jar-tally:empty{ display:none; }
+
+  /* ================= BREATHING EXERCISE ================= */
+  .breathe-overlay{
+    position:absolute; inset:0; z-index:40; border-radius:34px; overflow:hidden; background: var(--paper);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; padding:30px;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition: opacity 600ms ease, visibility 600ms ease;
+  }
+  .breathe-overlay.open{ opacity:1; visibility:visible; pointer-events:auto; }
+  .breathe-stage{ width:260px; height:260px; display:flex; align-items:center; justify-content:center; }
+  .breathe-orb{
+    width:150px; height:150px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, var(--state-tint), var(--state-color) 70%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset, 0 24px 60px -14px var(--state-shadow);
+  }
+  .breathe-overlay.running .breathe-orb{ animation: breatheGuide 10s ease-in-out infinite; }
+  @keyframes breatheGuide{ 0%{ transform:scale(1); } 50%{ transform:scale(1.55); } 100%{ transform:scale(1); } }
+  .breathe-labels{ position:relative; height:30px; width:100%; text-align:center; font-family: var(--display); font-size:22px; }
+  .breathe-in, .breathe-out, .breathe-static{ position:absolute; left:0; right:0; opacity:0; }
+  .breathe-static{ display:none; }
+  .breathe-overlay.running .breathe-in{ animation: labelIn 10s linear infinite; }
+  .breathe-overlay.running .breathe-out{ animation: labelOut 10s linear infinite; }
+  @keyframes labelIn{ 0%{ opacity:0; } 6%{ opacity:1; } 44%{ opacity:1; } 50%{ opacity:0; } 100%{ opacity:0; } }
+  @keyframes labelOut{ 0%{ opacity:0; } 50%{ opacity:0; } 56%{ opacity:1; } 94%{ opacity:1; } 100%{ opacity:0; } }
+  .breathe-note{ font-size:13px; color: var(--ink-soft); text-align:center; max-width:250px; }
+  .breathe-actions{ display:flex; gap:12px; align-items:center; }
+  @media (prefers-reduced-motion: reduce){
+    .breathe-in, .breathe-out{ display:none; }
+    .breathe-static{ display:block; opacity:1; }
+  }
+
+  /* ---- tutorial: two new slides ---- */
+  .tut-split{ width:150px; height:18px; border-radius:100px; background: var(--clear-soft); overflow:hidden; position:relative; }
+  .tut-split::before{
+    content:''; position:absolute; left:0; top:0; bottom:0; width:0; background: var(--hazy);
+    animation: tutSplit 3200ms ease-in-out infinite;
+  }
+  @keyframes tutSplit{ 0%{ width:0; } 30%,80%{ width:38%; } 100%{ width:0; } }
+  .tut-jar{
+    position:relative; width:64px; height:84px; border:2px solid var(--line); border-top-width:6px;
+    border-radius:10px 10px 18px 18px; background: var(--paper-dim); overflow:hidden;
+  }
+  .tut-pebble{
+    position:absolute; left:19px; top:-26px; width:22px; height:22px; border-radius:50%; background: var(--clear);
+    animation: tutDrop 3000ms ease-in infinite;
+  }
+  @keyframes tutDrop{
+    0%{ top:-26px; opacity:1; background: var(--clear); }
+    35%{ top:48px; }
+    45%{ top:44px; }
+    80%{ top:44px; opacity:1; background: var(--hazy); }
+    100%{ top:44px; opacity:0; background: var(--hazy); }
+  }
+
+  ::-webkit-scrollbar{ width:0; height:0; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screens">
+
+    <!-- ============ TODAY ============ -->
+    <section class="screen active" id="screen-today">
+      <div class="today-top">
+        <div>
+          <div class="greeting" id="greetingText">Good afternoon</div>
+          <div class="date" id="dateText"></div>
+        </div>
+        <div class="today-top-right">
+          <div class="eyebrow">Steady</div>
+          <button class="help-btn" id="helpBtn" aria-label="Show the tutorial">?</button>
+        </div>
+      </div>
+
+      <div class="orb-wrap">
+        <div class="orb-stage" id="orbStage">
+          <div class="orb-glow" aria-hidden="true"></div>
+          <div class="orb-ring" id="orbRing" aria-hidden="true"></div>
+          <div class="orb-goo" id="orbGoo">
+            <button class="orb" id="orbBtn" aria-label="Tap to reveal your balance"></button>
+          </div>
+          <div class="orb-focus" aria-hidden="true"></div>
+        </div>
+
+        <div class="state-copy">
+          <div class="state-headline" id="stateHeadline">You're doing okay</div>
+          <div class="state-sub" id="stateSub">There's a bit of room to breathe right now.</div>
+        </div>
+
+        <button class="reveal-btn" id="revealBtn">Show me the number</button>
+        <div class="number-panel">
+          <div class="number-value num" id="numberValue">$300 left this week</div>
+          <div class="number-sub num" id="numberSub"></div>
+        </div>
+        <button class="jar-nudge" id="jarNudge">Something in your jar is ready to look at</button>
+      </div>
+
+      <div class="cta-row">
+        <button class="log-cta" id="goLogBtn">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Log something
+        </button>
+        <button class="breather-btn" id="breatherBtn" aria-label="Take a breather">
+          <svg viewBox="0 0 24 24"><path d="M3 9c3-3 6 3 9 0s6 3 9 0M3 15c3-3 6 3 9 0s6 3 9 0"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ LOG ============ -->
+    <section class="screen" id="screen-log">
+      <div class="log-header">
+        <h2>Log something</h2>
+        <p>Just pick what it was for — the number is optional.</p>
+      </div>
+
+      <div class="cat-grid" id="catGrid"><!-- injected --></div>
+
+      <div class="amount-section" id="amountSection">
+        <div class="field-tip">Add an amount, if you'd like</div>
+        <input class="exact-input" id="exactInput" inputmode="decimal" placeholder="$0.00 (optional)">
+      </div>
+
+      <div class="save-row">
+        <button class="save-btn" id="saveBtn">Save it — no judgment</button>
+        <div class="center-row">
+          <button class="text-toggle" id="logToJarBtn">Haven't bought it yet? Park it for 48 hours</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ JAR ============ -->
+    <section class="screen" id="screen-jar">
+      <div class="log-header">
+        <h2>Cooling-off jar</h2>
+        <p>Want something? Park it here for 48 hours first. If it still feels right after, go for it.</p>
+      </div>
+
+      <div class="jar-stage" id="jarStage"><!-- injected --></div>
+
+      <div class="jar-ready" id="jarReady"><!-- injected --></div>
+
+      <div class="jar-form">
+        <input class="text-input" id="jarName" maxlength="60" autocomplete="off" placeholder="What are you thinking of buying?">
+        <input class="exact-input" id="jarAmount" inputmode="decimal" placeholder="$0.00 (optional)">
+        <button class="save-btn" id="jarParkBtn">Park for 48 hours</button>
+      </div>
+
+      <div class="jar-list-head">
+        <span>Waiting in the jar</span>
+        <button class="text-toggle" id="jarNumbersToggle">Show the numbers</button>
+      </div>
+      <div class="jar-list" id="jarList"><!-- injected --></div>
+      <div class="jar-tally" id="jarTally"></div>
+    </section>
+
+    <!-- ============ REFLECT ============ -->
+    <section class="screen" id="screen-reflect">
+      <div class="reflect-header">
+        <h2>This week</h2>
+        <p>A shape, not a spreadsheet.</p>
+      </div>
+
+      <div class="week-card">
+        <div class="week-line" id="weekLine">Nothing's logged yet this week.</div>
+        <div class="bars" id="barsRow"><!-- injected --></div>
+        <button class="details-toggle" id="detailsToggle">Show the numbers</button>
+      </div>
+
+      <div class="insight-card">
+        <svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="4"/></svg>
+        <p id="insightText">Log a few things and this page will start to fill in.</p>
+      </div>
+
+      <div class="breath-link">
+        <button id="breathBtn">Just want a breather?</button>
+      </div>
+    </section>
+
+    <!-- ============ BUDGET ============ -->
+    <section class="screen" id="screen-budget">
+      <div class="budget-header">
+        <h2>Your budget</h2>
+        <p>Add to it or set a new total, whenever you need to.</p>
+      </div>
+
+      <div class="field-block">
+        <div class="field-label">Currency</div>
+        <div class="currency-grid" id="currencyGrid"><!-- injected --></div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-label">Over what period?</div>
+        <div class="period-row">
+          <button class="period-btn" data-period="weekly">Weekly</button>
+          <button class="period-btn" data-period="monthly">Monthly</button>
+        </div>
+
+        <div class="current-budget-card">
+          <div class="current-budget-label" id="currentBudgetLabel">Your budget this week</div>
+          <div class="current-budget-value num" id="currentBudgetValue">$0</div>
+          <div class="current-budget-sub" id="currentBudgetSub">Nothing set yet</div>
+          <div class="current-budget-sub flex-line" id="currentBudgetFlex"></div>
+
+          <div class="mode-row">
+            <button class="mode-btn" data-mode="add">Add Extra Funds (+)</button>
+            <button class="mode-btn" data-mode="reset">Change Total Limit</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-label" id="stepperFieldLabel">How much would you like to add?</div>
+        <div class="stepper-card">
+          <div class="stepper-row">
+            <button class="stepper-btn" id="stepDown" aria-label="Decrease">–</button>
+            <div class="stepper-value num" id="stepperValue">$50</div>
+            <button class="stepper-btn" id="stepUp" aria-label="Increase">+</button>
+          </div>
+          <div class="stepper-hint" id="stepperHint">Nudge to set how much to add</div>
+
+          <button class="text-toggle" id="budgetExactToggle">I'd rather type the exact number</button>
+          <div class="exact-wrap" id="budgetExactWrap">
+            <input class="exact-input" id="budgetExactInput" inputmode="decimal" placeholder="$0.00">
+          </div>
+        </div>
+      </div>
+
+      <div class="budget-save-row">
+        <button class="save-btn ready" id="saveBudgetBtn">Add funds</button>
+      </div>
+
+      <div class="recent-changes" id="recentChanges"><!-- injected --></div>
+
+      <details class="more-panel" id="fixedPanel">
+        <summary><span>Fixed costs</span><span class="panel-hint" id="fixedHint">Nothing set aside</span></summary>
+        <div class="panel-body">
+          <p class="panel-note">Rent, bills, subscriptions. Steady sets these aside first, so the orb only reflects money that's safe to spend. Your budget total includes them.</p>
+          <div class="fixed-list" id="fixedList"><!-- injected --></div>
+          <div class="preset-row" id="fixedPresets"><!-- injected --></div>
+          <input class="text-input" id="fixedName" maxlength="40" autocomplete="off" placeholder="Name, like Rent">
+          <div class="fixed-form-row">
+            <input class="exact-input" id="fixedAmount" inputmode="decimal" placeholder="$0.00">
+            <div class="freq-row">
+              <button class="freq-btn selected" type="button" data-freq="monthly">Monthly</button>
+              <button class="freq-btn" type="button" data-freq="weekly">Weekly</button>
+            </div>
+          </div>
+          <button class="save-btn ready compact" id="fixedAddBtn">Set it aside</button>
+          <div class="inline-msg" id="fixedMsg" role="status" aria-live="polite"></div>
+        </div>
+      </details>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-title">Sound &amp; touch</div>
+          <div class="setting-sub">Soft chimes, and a gentle buzz on phones that support it.</div>
+        </div>
+        <button class="switch" id="soundSwitch" role="switch" aria-checked="true" aria-label="Sound and touch"><span class="knob"></span></button>
+      </div>
+
+      <details class="more-panel" id="backupPanel">
+        <summary><span>Backup &amp; restore</span><span class="panel-hint">Stays on your device</span></summary>
+        <div class="panel-body">
+          <p class="panel-note">Your data lives on this device. Download a backup to keep it safe, or to move to another device and restore it there. Nothing is uploaded anywhere.</p>
+          <div class="btn-row">
+            <button class="pill-btn solid" id="backupDownloadBtn">Download backup</button>
+            <button class="pill-btn" id="backupCopyBtn">Copy as text</button>
+          </div>
+          <textarea class="paste-area hidden-area" id="backupText" rows="4" readonly aria-label="Backup text"></textarea>
+          <div class="sub-label">Restore</div>
+          <div class="btn-row">
+            <button class="pill-btn" id="restoreFileBtn">Choose a backup file</button>
+          </div>
+          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <textarea class="paste-area" id="restoreText" rows="3" placeholder="…or paste backup text here" aria-label="Paste backup text"></textarea>
+          <div class="btn-row">
+            <button class="pill-btn" id="restoreTextBtn">Restore from text</button>
+          </div>
+          <div class="restore-confirm" id="restoreConfirm">
+            <div id="restoreSummary"></div>
+            <div class="btn-row">
+              <button class="pill-btn solid small" id="restoreApplyBtn">Replace</button>
+              <button class="pill-btn small" id="restoreCancelBtn">Cancel</button>
+            </div>
+          </div>
+          <div class="inline-msg" id="backupMsg" role="status" aria-live="polite"></div>
+        </div>
+      </details>
+
+      <div class="reset-zone">
+        <button class="text-toggle" id="replayTutorialBtn" style="margin-top:0;">Replay the tutorial</button>
+      </div>
+
+      <div class="reset-zone">
+        <button class="text-toggle" id="resetDataBtn" style="margin-top:0;">Reset all my data</button>
+        <div class="reset-confirm" id="resetConfirm">
+          <p class="reset-confirm-text">Reset everything? This can't be undone.</p>
+          <div class="reset-confirm-row">
+            <button class="reset-cancel-btn" id="resetCancelBtn">Cancel</button>
+            <button class="reset-yes-btn" id="resetConfirmBtn">Yes, reset it</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="toast" id="appToast" role="status" aria-live="polite"></div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" data-screen="today">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 9v3l2 2"/></svg>
+      Today
+    </button>
+    <button class="nav-btn" data-screen="log">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Log
+    </button>
+    <button class="nav-btn" data-screen="jar">
+      <svg viewBox="0 0 24 24"><path d="M8 3h8M9 3v2.5M15 3v2.5M7 8.5C7 6.8 8 5.5 9 5.5h6c1 0 2 1.3 2 3V19a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z"/></svg>
+      Jar<span class="nav-dot" id="jarDot"></span>
+    </button>
+    <button class="nav-btn" data-screen="reflect">
+      <svg viewBox="0 0 24 24"><path d="M4 19h16M7 19v-6M12 19V9M17 19v-3"/></svg>
+      Reflect
+    </button>
+    <button class="nav-btn" data-screen="budget">
+      <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="17" cy="14" r="1.2"/></svg>
+      Budget
+    </button>
+  </nav>
+
+  <!-- ============ BREATHING EXERCISE ============ -->
+  <div class="breathe-overlay" id="breatheOverlay" role="dialog" aria-modal="true" aria-label="Breathing exercise" aria-hidden="true">
+    <div class="breathe-stage"><div class="breathe-orb"></div></div>
+    <div class="breathe-labels">
+      <span class="breathe-in">Breathe in</span>
+      <span class="breathe-out">Breathe out</span>
+      <span class="breathe-static">Breathe slowly</span>
+    </div>
+    <p class="breathe-note">Five seconds in, five seconds out. Stay as long as you like.</p>
+    <div class="breathe-actions">
+      <button class="pill-btn" id="breatheSoundBtn" aria-pressed="true">Sound on</button>
+      <button class="pill-btn solid" id="breatheDoneBtn">I'm ready</button>
+    </div>
+  </div>
+
+  <!-- ============ ANIMATED TUTORIAL ============ -->
+  <div class="tutorial-overlay" id="tutorialOverlay">
+    <div class="tutorial-track" id="tutorialTrack">
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration"><div class="tut-orb"></div></div>
+        <div class="tutorial-title">Welcome to Steady</div>
+        <div class="tutorial-text">A calmer way to keep an eye on money — no numbers until you're ready for them.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration">
+          <div class="tut-today-demo">
+            <div class="tut-ripple"></div>
+            <div class="tut-mini-orb"></div>
+            <div class="tut-number num">$140 left</div>
+          </div>
+        </div>
+        <div class="tutorial-title">Tap the orb anytime</div>
+        <div class="tutorial-text">Its color quietly tells you how things are going. Tap it whenever you want the exact number.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration">
+          <div class="tut-cats">
+            <div class="tut-cat-dot"></div>
+            <div class="tut-cat-dot"></div>
+            <div class="tut-cat-dot"></div>
+          </div>
+        </div>
+        <div class="tutorial-title">Log in seconds</div>
+        <div class="tutorial-text">Pick a category, add an amount if you'd like, and save — no judgment, no long forms.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration">
+          <div class="tut-bars">
+            <div class="tut-bar" style="--bar-h:35%"></div>
+            <div class="tut-bar" style="--bar-h:60%; animation-delay:150ms;"></div>
+            <div class="tut-bar" style="--bar-h:45%; animation-delay:300ms;"></div>
+            <div class="tut-bar" style="--bar-h:70%; animation-delay:450ms;"></div>
+          </div>
+        </div>
+        <div class="tutorial-title">Reflect on your week</div>
+        <div class="tutorial-text">See your spending as simple shapes. Tap "Show the numbers" only when you want the detail.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration">
+          <div class="tut-budget-demo">
+            <div class="tut-tick-value num">$300</div>
+            <div class="tut-plus-btn">+</div>
+          </div>
+        </div>
+        <div class="tutorial-title">Set your budget anytime</div>
+        <div class="tutorial-text">Add extra funds or set a brand-new total — weekly or monthly, your call.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration"><div class="tut-split"></div></div>
+        <div class="tutorial-title">Set the fixed stuff aside</div>
+        <div class="tutorial-text">Add rent, bills and subscriptions once. Steady reserves them first, so the orb only reflects what's safe to spend.</div>
+      </div>
+
+      <div class="tutorial-slide">
+        <div class="tutorial-illustration"><div class="tut-jar"><div class="tut-pebble"></div></div></div>
+        <div class="tutorial-title">Park it for 48 hours</div>
+        <div class="tutorial-text">Want something? Drop it in the jar first. After two days, decide: still love it, or let it go.</div>
+      </div>
+
+    </div>
+
+    <div class="tutorial-controls">
+      <div class="tutorial-dots" id="tutorialDots"><!-- injected --></div>
+      <div class="tutorial-buttons">
+        <button class="tutorial-skip" id="tutorialSkipBtn">Skip</button>
+        <button class="tutorial-next" id="tutorialNextBtn">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // =========================================================
+  // MODEL
+  // budgetHistory: [{ id, type:'topup'|'reset', amount, date(ISO), period }]
+  //   — every top-up or new-total action, tagged with the period mode active
+  //     at the time. The current cumulative total for a period is derived by
+  //     replaying the history entries that fall within that period's current
+  //     calendar window (this week / this month).
+  // entries: [{ id, cat, amount, date(ISO string) }] — spending log
+  // =========================================================
+  // fixedCosts: [{ id, name, amount, freq:'weekly'|'monthly' }] — recurring
+  //   commitments. Steady reserves their share of the current period before
+  //   the orb is judged, so the orb only reflects money that is safe to spend.
+  // jar: [{ id, name, amount|null, parkedAt(ISO), status:'parked'|'kept'|'released',
+  //   resolvedAt(ISO)|null }] — the 48-hour cooling-off jar.
+  // settings: { sound } — one switch for chimes and haptics.
+  const model = {
+    currency: 'USD',
+    period: 'weekly',
+    budgetHistory: [],
+    entries: [],
+    fixedCosts: [],
+    jar: [],
+    settings: { sound: true }
+  };
+
+  const STORAGE_KEY = 'steady:state';
+  const JAR_MS = 48 * 60 * 60 * 1000;          // the cooling-off window
+  const WEEKS_PER_MONTH = 52 / 12;             // used to convert fixed costs between periods
+  const MAX_ITEMS = 5000;                      // guard against absurd restore files
+
+  const categoryDefaults = { food:15, home:50, fun:20, transport:12, care:30, other:20 };
+
+  const currencies = [
+    { code:'USD', sym:'$' },
+    { code:'EUR', sym:'€' },
+    { code:'GBP', sym:'£' },
+    { code:'INR', sym:'₹' },
+    { code:'JPY', sym:'¥' },
+    { code:'AUD', sym:'A$' },
+    { code:'CAD', sym:'C$' },
+  ];
+
+  const categories = [
+    { key:'food', label:'Food', icon:'<path d="M7 3v7a2 2 0 0 0 2 2h0M9 3v9M13 3c0 3-2 3-2 6v9"/>' },
+    { key:'home', label:'Home', icon:'<path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>' },
+    { key:'fun', label:'Fun', icon:'<circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M8.5 15c1 1 6 1 7 0"/>' },
+    { key:'transport', label:'Transport', icon:'<rect x="3.5" y="9" width="17" height="7" rx="2"/><circle cx="7.5" cy="17.5" r="1.3"/><circle cx="16.5" cy="17.5" r="1.3"/>' },
+    { key:'care', label:'Care', icon:'<path d="M12 20s-7-4.4-7-9.6A4.4 4.4 0 0 1 12 7.8a4.4 4.4 0 0 1 7 2.6C19 15.6 12 20 12 20z"/>' },
+    { key:'other', label:'Other', icon:'<circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/>' },
+  ];
+
+  const fullWeekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const shortWeekDays = ['M','T','W','T','F','S','S'];
+
+  const STATE_COLOR_VARS = {
+    clear:  ['--clear','--clear-soft','--clear-tint','--clear-shadow','--clear-bg'],
+    hazy:   ['--hazy','--hazy-soft','--hazy-tint','--hazy-shadow','--hazy-bg'],
+    stormy: ['--stormy','--stormy-soft','--stormy-tint','--stormy-shadow','--stormy-bg']
+  };
+
+  const STATE_COPY = {
+    clear:  { headline: "You're doing okay", sub: "There's a bit of room to breathe right now.", motes: 3 },
+    hazy:   { headline: "Things are a little tight", sub: "Nothing urgent — just worth going gently on extras.", motes: 5 },
+    stormy: { headline: "Take a breath", sub: "It's a snug stretch. One small step at a time is plenty.", motes: 7 }
+  };
+
+  // =========================================================
+  // HELPERS: currency / money formatting
+  // =========================================================
+  function currencySymbol(){
+    return (currencies.find(c => c.code === model.currency) || currencies[0]).sym;
+  }
+  function formatMoney(amount){
+    const rounded = Math.round(amount);
+    return `${currencySymbol()}${Math.abs(rounded).toLocaleString()}`;
+  }
+
+  // =========================================================
+  // HELPERS: dates / periods
+  // =========================================================
+  function mondayIndex(date){ return (date.getDay() + 6) % 7; } // Mon=0 ... Sun=6
+
+  function startOfWeek(date){
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() - mondayIndex(d));
+    return d;
+  }
+  function startOfMonth(date){
+    const d = new Date(date.getFullYear(), date.getMonth(), 1);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function getPeriodWindow(period){
+    const now = new Date();
+    if(period === 'monthly'){
+      const start = startOfMonth(now);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+      return { start, end };
+    }
+    const start = startOfWeek(now);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return { start, end };
+  }
+  function getSpent(period){
+    const { start, end } = getPeriodWindow(period);
+    return model.entries.reduce((sum, e) => {
+      const d = new Date(e.date);
+      return (d >= start && d < end) ? sum + e.amount : sum;
+    }, 0);
+  }
+  function getWeekDayTotals(){
+    const { start } = getPeriodWindow('weekly');
+    const totals = [0,0,0,0,0,0,0];
+    model.entries.forEach(e => {
+      const d = new Date(e.date);
+      const dayDiff = Math.floor((d - start) / 86400000);
+      if(dayDiff >= 0 && dayDiff < 7) totals[dayDiff] += e.amount;
+    });
+    return totals;
+  }
+
+  // Cumulative budget total for the CURRENT cycle of a given period type.
+  // Replays that period's history entries (topup/reset) within the current
+  // calendar window, in chronological order, starting from 0. This means
+  // a new week/month naturally starts at $0 until a budget is set for it —
+  // weekly and monthly are tracked as separate, independent budgets.
+  function getBudgetTotal(period){
+    const { start, end } = getPeriodWindow(period);
+    const relevant = model.budgetHistory
+      .filter(h => h.period === period)
+      .filter(h => { const d = new Date(h.date); return d >= start && d < end; })
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+    let total = 0;
+    relevant.forEach(h => { total = (h.type === 'reset') ? h.amount : total + h.amount; });
+    return { total, count: relevant.length, entries: relevant };
+  }
+
+  function relativeDayLabel(dateStr){
+    const d = new Date(dateStr);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dOnly = new Date(d); dOnly.setHours(0,0,0,0);
+    const diffDays = Math.round((today - dOnly) / 86400000);
+    if(diffDays <= 0) return 'today';
+    if(diffDays === 1) return 'yesterday';
+    return `${diffDays} days ago`;
+  }
+
+  // =========================================================
+  // SMALL SHARED HELPERS
+  // =========================================================
+  function newId(){ return Date.now() + '-' + Math.random().toString(36).slice(2, 7); }
+  function isPosNum(v){ return typeof v === 'number' && isFinite(v) && v > 0; }
+  function isIsoDate(v){ return typeof v === 'string' && !isNaN(new Date(v).getTime()); }
+  function cleanText(v, max){
+    return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  }
+  // Accepts "1,200", "$45.50" and similar; NaN when nothing usable is there.
+  function parseAmount(raw){
+    const cleaned = String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, '');
+    return cleaned ? parseFloat(cleaned) : NaN;
+  }
+  function plural(n, one, many){ return n === 1 ? one : many; }
+
+  // Tiny element builder. Text goes in via textContent, so anything a person
+  // types (item names, fixed-cost names) can never be read as HTML.
+  function h(tag, props){
+    const el = document.createElement(tag);
+    const p = props || {};
+    Object.keys(p).forEach(key => {
+      const val = p[key];
+      if(key === 'class') el.className = val;
+      else if(key === 'text') el.textContent = val;
+      else if(key === 'on') Object.keys(val).forEach(ev => el.addEventListener(ev, val[ev]));
+      else el.setAttribute(key, val);
+    });
+    for(let i = 2; i < arguments.length; i++){
+      if(arguments[i]) el.appendChild(arguments[i]);
+    }
+    return el;
+  }
+
+  // =========================================================
+  // PERSISTENCE (best-effort — app works fine without it)
+  // =========================================================
+  // `window.storage` can exist as an object without actually working
+  // (methods missing, calls rejecting, sandbox restrictions, etc.), so
+  // rather than trusting mere presence, we run one real write+read
+  // round-trip and cache whether it actually succeeded. Every call site
+  // below checks that cached result instead of `if(!window.storage)`.
+  let storageAvailable = null; // null = untested yet
+
+  async function checkStorageAvailable(){
+    if(storageAvailable !== null) return storageAvailable;
+    try{
+      if(!window.storage || typeof window.storage.set !== 'function' || typeof window.storage.get !== 'function'){
+        storageAvailable = false;
+        return false;
+      }
+      const probeKey = 'steady:__storage_probe__';
+      const probeValue = String(Date.now());
+      await window.storage.set(probeKey, probeValue, false);
+      const res = await window.storage.get(probeKey, false);
+      storageAvailable = !!(res && res.value === probeValue);
+    }catch(err){
+      storageAvailable = false;
+    }
+    return storageAvailable;
+  }
+
+  // Everything below funnels through serializeState / sanitizeState /
+  // applyState, so saving, loading, backup and restore can never drift apart.
+  function serializeState(){
+    return {
+      currency: model.currency,
+      period: model.period,
+      budgetHistory: model.budgetHistory,
+      entries: model.entries,
+      fixedCosts: model.fixedCosts,
+      jar: model.jar,
+      settings: model.settings
+    };
+  }
+
+  // Never trust stored or imported data: check every field, drop what's
+  // malformed, and fill in defaults for anything an older version didn't have.
+  function sanitizeState(raw){
+    const s = (raw && typeof raw === 'object') ? raw : {};
+    const arr = v => Array.isArray(v) ? v.slice(-MAX_ITEMS) : [];
+    const catKeys = categories.map(c => c.key);
+    const out = {
+      currency: currencies.some(c => c.code === s.currency) ? s.currency : 'USD',
+      period: s.period === 'monthly' ? 'monthly' : 'weekly',
+      budgetHistory: [], entries: [], fixedCosts: [], jar: [],
+      settings: { sound: !(s.settings && s.settings.sound === false) }
+    };
+    arr(s.budgetHistory).forEach(x => {
+      if(x && (x.type === 'topup' || x.type === 'reset') && isPosNum(x.amount) && isIsoDate(x.date)){
+        out.budgetHistory.push({
+          id: (typeof x.id === 'string' && x.id) ? x.id.slice(0, 60) : newId(),
+          type: x.type, amount: x.amount, date: new Date(x.date).toISOString(),
+          period: x.period === 'monthly' ? 'monthly' : 'weekly'
+        });
+      }
+    });
+    if(!Array.isArray(s.budgetHistory) && isPosNum(s.budget)){
+      // Oldest format: a single budget number.
+      out.budgetHistory.push({ id: 'migrated', type: 'reset', amount: s.budget, date: new Date().toISOString(), period: out.period });
+    }
+    arr(s.entries).forEach(x => {
+      if(x && isPosNum(x.amount) && isIsoDate(x.date)){
+        out.entries.push({
+          id: (typeof x.id === 'string' && x.id) ? x.id.slice(0, 60) : newId(),
+          cat: catKeys.indexOf(x.cat) >= 0 ? x.cat : 'other',
+          amount: x.amount, date: new Date(x.date).toISOString()
+        });
+      }
+    });
+    arr(s.fixedCosts).forEach(x => {
+      const name = cleanText(x && x.name, 40);
+      if(x && name && isPosNum(x.amount)){
+        out.fixedCosts.push({
+          id: (typeof x.id === 'string' && x.id) ? x.id.slice(0, 60) : newId(),
+          name, amount: x.amount, freq: x.freq === 'weekly' ? 'weekly' : 'monthly'
+        });
+      }
+    });
+    arr(s.jar).forEach(x => {
+      const name = cleanText(x && x.name, 60);
+      if(x && name && isIsoDate(x.parkedAt)){
+        const status = (x.status === 'kept' || x.status === 'released') ? x.status : 'parked';
+        out.jar.push({
+          id: (typeof x.id === 'string' && x.id) ? x.id.slice(0, 60) : newId(),
+          name, amount: isPosNum(x.amount) ? x.amount : null,
+          parkedAt: new Date(x.parkedAt).toISOString(), status,
+          resolvedAt: (status !== 'parked' && isIsoDate(x.resolvedAt)) ? new Date(x.resolvedAt).toISOString() : null
+        });
+      }
+    });
+    return out;
+  }
+
+  function applyState(clean){
+    model.currency = clean.currency;
+    model.period = clean.period;
+    model.budgetHistory = clean.budgetHistory;
+    model.entries = clean.entries;
+    model.fixedCosts = clean.fixedCosts;
+    model.jar = clean.jar;
+    model.settings = clean.settings;
+  }
+
+  async function loadState(){
+    try{
+      if(!(await checkStorageAvailable())) return;
+      const res = await window.storage.get(STORAGE_KEY, false);
+      if(res && res.value) applyState(sanitizeState(JSON.parse(res.value)));
+    }catch(err){
+      // No saved state yet, or storage unavailable — continue with defaults.
+    }
+  }
+
+  // Saves run one at a time. If something changes while a save is in flight,
+  // exactly one more save follows with the latest state, so a slow earlier
+  // write can never land last and overwrite newer data.
+  let persisting = false;
+  let persistAgain = false;
+  async function persist(){
+    if(persisting){ persistAgain = true; return; }
+    persisting = true;
+    try{
+      do{
+        persistAgain = false;
+        if(!(await checkStorageAvailable())) break;
+        await window.storage.set(STORAGE_KEY, JSON.stringify(serializeState()), false);
+      }while(persistAgain);
+    }catch(err){
+      // Best-effort — session still works, it just won't persist.
+    }finally{
+      persisting = false;
+    }
+  }
+
+  // =========================================================
+  // UI STATE
+  // =========================================================
+  let selectedCat = null;
+  let numbersShown = false;
+  let weekDetailsShown = false;
+  let budgetMode = 'add'; // 'add' (top-up) | 'reset' (new total)
+  let budgetDraftAmount = 50;
+  let budgetExactOpen = false;
+  let tutorialIndex = 0;
+  let saveEntryReturnTimer = null;
+  let toastTimer = null;
+  let audioCtx = null;
+  let oceanHandle = null;
+  let jarNumbersShown = false;
+  let jarTimer = null;
+  let fixedFreq = 'monthly';
+  let pendingRestore = null;
+  let renderedMotes = -1;
+  const TUTORIAL_SLIDE_COUNT = 7;
+  const TUTORIAL_SEEN_KEY = 'steady:tutorialSeen';
+
+  // =========================================================
+  // DERIVED MONEY STATE (never surfaced as raw numbers on Today)
+  // =========================================================
+  // A fixed cost's share of a given period (monthly rent in a weekly view
+  // reserves a week's worth of it, and so on).
+  function toPeriodAmount(cost, period){
+    if(cost.freq === period) return cost.amount;
+    return period === 'weekly' ? cost.amount / WEEKS_PER_MONTH : cost.amount * WEEKS_PER_MONTH;
+  }
+  function getFixedReserved(period){
+    return model.fixedCosts.reduce((sum, c) => sum + toPeriodAmount(c, period), 0);
+  }
+  // total = everything in the budget; reserved = set aside for fixed costs;
+  // flexible = what is genuinely safe to spend (can go negative).
+  function getFlexibleBudget(period){
+    const { total } = getBudgetTotal(period);
+    const reserved = getFixedReserved(period);
+    return { total, reserved, flexible: total - reserved };
+  }
+
+  function getMoneyState(){
+    const { flexible } = getFlexibleBudget(model.period);
+    if(flexible <= 0) return 'stormy';
+    const ratio = getSpent(model.period) / flexible;
+    if (ratio < 0.6) return 'clear';
+    if (ratio < 0.85) return 'hazy';
+    return 'stormy';
+  }
+
+  function applyStateColors(state){
+    const root = document.documentElement.style;
+    const [colorVar, softVar, tintVar, shadowVar, bgVar] = STATE_COLOR_VARS[state];
+    root.setProperty('--state-color', `var(${colorVar})`);
+    root.setProperty('--state-soft', `var(${softVar})`);
+    root.setProperty('--state-tint', `var(${tintVar})`);
+    root.setProperty('--state-shadow', `var(${shadowVar})`);
+    root.setProperty('--bg-top', `var(${bgVar})`);
+  }
+
+  // Droplets orbit inside the goo layer. They're deliberately larger than plain
+  // dots: the filter erases anything too small, so these are sized to survive it
+  // and to melt into the orb when they drift close. Only rebuilt when the count
+  // changes, so re-rendering Today doesn't make them jump.
+  function renderMotes(count){
+    if(count === renderedMotes) return;
+    renderedMotes = count;
+    const stage = document.getElementById('orbGoo');
+    stage.querySelectorAll('.mote').forEach(m => m.remove());
+    const radius = 102;
+    for(let i=0;i<count;i++){
+      const angle = (i / count) * Math.PI * 2;
+      const dist = radius + (i % 2 === 0 ? 0 : 14);
+      const size = 18 + (i % 3) * 4;
+      const x = 115 + Math.cos(angle) * dist - size / 2;
+      const y = 115 + Math.sin(angle) * dist - size / 2;
+      const mote = document.createElement('div');
+      mote.className = 'mote';
+      mote.style.width = size + 'px';
+      mote.style.height = size + 'px';
+      mote.style.left = x + 'px';
+      mote.style.top = y + 'px';
+      mote.style.animationDelay = (i * 0.6) + 's';
+      mote.style.animationDuration = (7 + i % 4) + 's';
+      stage.insertBefore(mote, stage.firstChild);
+    }
+  }
+
+  // =========================================================
+  // TODAY SCREEN
+  // =========================================================
+  function renderToday(){
+    const b = getFlexibleBudget(model.period);
+    const periodLabel = model.period === 'weekly' ? 'this week' : 'this month';
+    const headlineEl = document.getElementById('stateHeadline');
+    const subEl = document.getElementById('stateSub');
+    const valueEl = document.getElementById('numberValue');
+    const noteEl = document.getElementById('numberSub');
+
+    if(b.total <= 0){
+      // Nothing set for this cycle yet — gentle prompt rather than a stark $0.
+      applyStateColors('clear');
+      headlineEl.textContent = "Let's set a budget";
+      subEl.textContent = "Head to the Budget tab whenever you're ready.";
+      renderMotes(STATE_COPY.clear.motes);
+      valueEl.textContent = `Nothing set yet ${periodLabel}`;
+      noteEl.textContent = '';
+    } else if(b.flexible <= 0){
+      // Fixed costs take the whole budget: say so plainly, without alarm.
+      applyStateColors('stormy');
+      headlineEl.textContent = STATE_COPY.stormy.headline;
+      subEl.textContent = `Your fixed costs take up the whole budget ${periodLabel}. Adding funds will open up some room.`;
+      renderMotes(STATE_COPY.stormy.motes);
+      valueEl.textContent = 'Nothing free after fixed costs';
+      noteEl.textContent = `${formatMoney(b.reserved)} is set aside ${periodLabel}`;
+    } else {
+      const state = getMoneyState();
+      applyStateColors(state);
+      headlineEl.textContent = STATE_COPY[state].headline;
+      subEl.textContent = STATE_COPY[state].sub;
+      renderMotes(STATE_COPY[state].motes);
+
+      const remaining = b.flexible - getSpent(model.period);
+      const word = b.reserved > 0 ? 'safe to spend' : 'left';
+      valueEl.textContent = remaining >= 0
+        ? `${formatMoney(remaining)} ${word} ${periodLabel}`
+        : `${formatMoney(remaining)} over ${periodLabel}`;
+      noteEl.textContent = b.reserved > 0 ? `after ${formatMoney(b.reserved)} set aside for fixed costs` : '';
+    }
+
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greetingText').textContent = greet;
+    document.getElementById('dateText').textContent =
+      new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+    syncNumberVisibility();
+    updateJarIndicators();
+  }
+
+  function syncNumberVisibility(){
+    document.getElementById('numberValue').classList.toggle('show', numbersShown);
+    document.getElementById('numberSub').classList.toggle('show', numbersShown);
+    document.getElementById('revealBtn').textContent = numbersShown ? 'Hide the number' : 'Show me the number';
+  }
+
+  function toggleNumber(){
+    numbersShown = !numbersShown;
+    syncNumberVisibility();
+  }
+
+  // One soft ring when you land back on Today after logging — a quiet "got it".
+  function pulseOrb(){
+    const ring = document.getElementById('orbRing');
+    ring.classList.remove('pulse');
+    void ring.offsetWidth;
+    ring.classList.add('pulse');
+  }
+
+  // =========================================================
+  // LOG SCREEN
+  // =========================================================
+  function renderCategories(){
+    const grid = document.getElementById('catGrid');
+    grid.innerHTML = '';
+    categories.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-btn';
+      btn.type = 'button';
+      btn.dataset.cat = cat.key;
+      btn.innerHTML = `<svg viewBox="0 0 24 24">${cat.icon}</svg><span>${cat.label}</span>`;
+      btn.addEventListener('click', () => selectCategory(cat.key, btn));
+      grid.appendChild(btn);
+    });
+  }
+
+  function selectCategory(key, btnEl){
+    selectedCat = key;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    document.getElementById('amountSection').classList.add('open');
+    evaluateSaveReady();
+  }
+
+  function evaluateSaveReady(){
+    document.getElementById('saveBtn').classList.toggle('ready', !!selectedCat);
+  }
+
+  function resetLogForm(){
+    selectedCat = null;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('amountSection').classList.remove('open');
+    document.getElementById('exactInput').value = '';
+    document.getElementById('saveBtn').classList.remove('ready');
+  }
+
+  function saveEntry(){
+    if(!selectedCat) return;
+    const exactVal = parseAmount(document.getElementById('exactInput').value);
+    const amount = (!isNaN(exactVal) && exactVal > 0) ? exactVal : (categoryDefaults[selectedCat] || 15);
+
+    model.entries.push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      cat: selectedCat,
+      amount,
+      date: new Date().toISOString()
+    });
+    persist();
+
+    showToast("Logged. That's one less thing to hold onto.");
+    feedback('log');
+    resetLogForm();
+    renderToday();
+
+    // Gently return to Today so the confirmation lands somewhere calm.
+    // Guarded so it never yanks the person away if they've already
+    // navigated elsewhere themselves in that brief window, and so
+    // logging several entries quickly doesn't stack up return-jumps.
+    if(saveEntryReturnTimer) clearTimeout(saveEntryReturnTimer);
+    saveEntryReturnTimer = setTimeout(() => {
+      saveEntryReturnTimer = null;
+      if(document.getElementById('screen-log').classList.contains('active')){
+        showScreen('today');
+        pulseOrb();
+      }
+    }, 400);
+  }
+
+  // =========================================================
+  // REFLECT SCREEN
+  // =========================================================
+  function renderBars(){
+    const row = document.getElementById('barsRow');
+    row.innerHTML = '';
+    const totals = getWeekDayTotals();
+    const max = Math.max(1, ...totals);
+    const todayIdx = mondayIndex(new Date());
+
+    totals.forEach((val, i) => {
+      const pct = val > 0 ? Math.max(14, (val / max) * 100) : 4;
+      const col = document.createElement('div');
+      col.className = 'bar-col';
+      col.innerHTML = `
+        <div class="bar-num num ${weekDetailsShown ? 'show' : ''}">${formatMoney(val)}</div>
+        <div class="bar ${i === todayIdx ? 'today' : ''}" style="height:${pct}%"></div>
+        <div class="bar-day">${shortWeekDays[i]}</div>
+      `;
+      row.appendChild(col);
+    });
+
+    renderWeekCopy(totals, todayIdx);
+  }
+
+  function renderWeekCopy(totals, todayIdx){
+    const weekTotal = totals.reduce((a,b) => a+b, 0);
+    const daysLogged = totals.filter(t => t > 0).length;
+    const weekLineEl = document.getElementById('weekLine');
+    const insightEl = document.getElementById('insightText');
+
+    if(weekTotal === 0){
+      weekLineEl.innerHTML = "Nothing's logged yet this week — it'll take shape as you go.";
+      insightEl.textContent = "Log a few things on the Log tab and this page will start to fill in.";
+      return;
+    }
+
+    let descriptor;
+    const weeklyBudget = getFlexibleBudget('weekly');
+    const weeklyBudgetTotal = weeklyBudget.flexible;
+    if(weeklyBudget.total > 0 && weeklyBudgetTotal <= 0){
+      descriptor = 'a <strong>tight</strong> week so far';
+    } else if(weeklyBudgetTotal > 0){
+      const ratio = weekTotal / weeklyBudgetTotal;
+      if(ratio < 0.5) descriptor = 'a <strong>light</strong> week so far';
+      else if(ratio < 0.85) descriptor = 'a <strong>steady</strong> week so far';
+      else if(ratio <= 1) descriptor = 'getting <strong>close</strong> to your budget';
+      else descriptor = 'a bit <strong>past</strong> your budget for the week';
+    } else {
+      descriptor = 'starting to take shape';
+    }
+    weekLineEl.innerHTML = `You've had ${descriptor}, with ${daysLogged} day${daysLogged===1?'':'s'} logged.`;
+
+    if(daysLogged === 1){
+      const loggedIdx = totals.findIndex(t => t > 0);
+      insightEl.textContent = `${fullWeekDays[loggedIdx]} is the only day you've logged so far — nice start.`;
+      return;
+    }
+    let maxIdx = 0;
+    for(let i=1;i<totals.length;i++){ if(totals[i] > totals[maxIdx]) maxIdx = i; }
+    insightEl.textContent = (maxIdx === todayIdx)
+      ? "Today's been your biggest day so far this week — that's alright, tomorrow's a fresh start."
+      : `${fullWeekDays[maxIdx]} has been your biggest day so far this week.`;
+  }
+
+  function toggleWeekDetails(){
+    weekDetailsShown = !weekDetailsShown;
+    document.querySelectorAll('.bar-num').forEach(n => n.classList.toggle('show', weekDetailsShown));
+    document.getElementById('detailsToggle').textContent = weekDetailsShown ? 'Hide the numbers' : 'Show the numbers';
+  }
+
+  // =========================================================
+  // BUDGET SCREEN
+  // =========================================================
+  function renderCurrencyChips(){
+    const grid = document.getElementById('currencyGrid');
+    grid.innerHTML = '';
+    currencies.forEach(c => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'currency-chip' + (c.code === model.currency ? ' selected' : '');
+      chip.dataset.code = c.code;
+      chip.innerHTML = `<span class="sym">${c.sym}</span><span>${c.code}</span>`;
+      chip.addEventListener('click', () => {
+        model.currency = c.code;
+        document.querySelectorAll('.currency-chip').forEach(b => b.classList.remove('selected'));
+        chip.classList.add('selected');
+        renderStepperValue();
+        renderCurrentBudgetSummary();
+        renderRecentChanges();
+        refreshCurrencyDisplays();
+        renderFixedCosts();
+        renderToday();
+        renderJar();
+      });
+      grid.appendChild(chip);
+    });
+  }
+
+  function renderPeriodButtons(){
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.period === model.period);
+      btn.onclick = () => {
+        model.period = btn.dataset.period;
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        // Switching period shows that cycle's own budget — refresh everything derived from it.
+        renderCurrentBudgetSummary();
+        budgetDraftAmount = computeDefaultDraft();
+        renderStepperValue();
+        renderRecentChanges();
+      };
+    });
+  }
+
+  function computeDefaultDraft(){
+    const { total } = getBudgetTotal(model.period);
+    return budgetMode === 'reset' ? (total > 0 ? total : 300) : 50;
+  }
+
+  function renderCurrentBudgetSummary(){
+    const { total, count } = getBudgetTotal(model.period);
+    const periodWord = model.period === 'weekly' ? 'this week' : 'this month';
+    document.getElementById('currentBudgetLabel').textContent = `Your budget ${periodWord}`;
+    document.getElementById('currentBudgetValue').textContent = formatMoney(total);
+    document.getElementById('currentBudgetSub').textContent =
+      count === 0 ? `Nothing set yet for ${periodWord}` : `Set across ${count} adjustment${count===1?'':'s'}`;
+
+    const reserved = getFixedReserved(model.period);
+    const flexEl = document.getElementById('currentBudgetFlex');
+    if(reserved <= 0){
+      flexEl.textContent = '';
+    } else if(total <= 0){
+      flexEl.textContent = 'Set a budget and Steady will take your fixed costs out of it first.';
+    } else {
+      flexEl.textContent = `${formatMoney(reserved)} is set aside for fixed costs, leaving ${formatMoney(Math.max(0, total - reserved))} safe to spend.`;
+    }
+  }
+
+  function renderModeButtons(){
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.mode === budgetMode);
+      btn.onclick = () => {
+        budgetMode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        budgetDraftAmount = computeDefaultDraft();
+        renderStepperValue();
+        updateModeCopy();
+        document.getElementById('budgetExactInput').value = '';
+      };
+    });
+    updateModeCopy();
+  }
+
+  function updateModeCopy(){
+    const isAdd = budgetMode === 'add';
+    document.getElementById('stepperFieldLabel').textContent =
+      isAdd ? 'How much would you like to add?' : "What should the new total be?";
+    document.getElementById('stepperHint').textContent =
+      isAdd ? 'Nudge to set how much to add' : 'Nudge until the new total feels right';
+    document.getElementById('saveBudgetBtn').textContent = isAdd ? 'Add funds' : 'Set new budget';
+  }
+
+  function renderStepperValue(){
+    document.getElementById('stepperValue').textContent = formatMoney(budgetDraftAmount);
+  }
+
+  function adjustStepper(delta){
+    budgetDraftAmount = Math.max(10, budgetDraftAmount + delta);
+    document.getElementById('budgetExactInput').value = '';
+    renderStepperValue();
+  }
+
+  function renderRecentChanges(){
+    const wrap = document.getElementById('recentChanges');
+    const { entries } = getBudgetTotal(model.period);
+    if(entries.length === 0){
+      wrap.innerHTML = '';
+      wrap.classList.remove('open');
+      return;
+    }
+    wrap.classList.add('open');
+    const recent = entries.slice(-5).reverse();
+    wrap.innerHTML = recent.map(h => {
+      const sign = h.type === 'topup' ? '+' : 'Set to';
+      return `<div class="change-row">
+        <span class="change-amount">${sign} ${formatMoney(h.amount)}</span>
+        <span class="change-date">${relativeDayLabel(h.date)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderBudgetScreen(){
+    renderCurrencyChips();
+    renderPeriodButtons();
+    renderCurrentBudgetSummary();
+    renderModeButtons();
+    budgetDraftAmount = computeDefaultDraft();
+    renderStepperValue();
+    document.getElementById('budgetExactInput').placeholder = `${currencySymbol()}0.00`;
+    document.getElementById('budgetExactInput').value = '';
+    renderRecentChanges();
+    hideResetConfirm();
+    refreshCurrencyDisplays();
+    renderFixedCosts();
+    renderSoundSwitch();
+  }
+
+  function saveBudget(){
+    const exactVal = parseAmount(document.getElementById('budgetExactInput').value);
+    const finalAmount = (!isNaN(exactVal) && exactVal > 0) ? exactVal : budgetDraftAmount;
+
+    model.budgetHistory.push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      type: budgetMode === 'add' ? 'topup' : 'reset',
+      amount: finalAmount,
+      date: new Date().toISOString(),
+      period: model.period
+    });
+    persist();
+
+    showToast(budgetMode === 'add'
+      ? `Added ${formatMoney(finalAmount)}.`
+      : 'Saved. New budget set.');
+    feedback('budget');
+
+    budgetExactOpen = false;
+    document.getElementById('budgetExactWrap').classList.remove('open');
+    document.getElementById('budgetExactToggle').textContent = "I'd rather type the exact number";
+
+    renderToday();
+    renderBars();
+    renderCurrentBudgetSummary();
+    budgetDraftAmount = computeDefaultDraft();
+    renderStepperValue();
+    renderRecentChanges();
+  }
+
+  function showResetConfirm(){ document.getElementById('resetConfirm').classList.add('open'); }
+  function hideResetConfirm(){ document.getElementById('resetConfirm').classList.remove('open'); }
+
+  function resetAllData(){
+    model.entries = [];
+    model.budgetHistory = [];
+    model.fixedCosts = [];
+    model.jar = [];
+    model.period = 'weekly';
+    model.currency = 'USD';
+    budgetMode = 'add';
+    numbersShown = false;
+    weekDetailsShown = false;
+    jarNumbersShown = false;
+    pendingRestore = null;
+    persist();
+    hideResetConfirm();
+    refreshCurrencyDisplays();
+    renderToday();
+    renderBars();
+    renderBudgetScreen();
+    renderJar();
+    showToast('All reset. Fresh start.');
+  }
+
+  // Keep every currency-aware placeholder in step with the chosen currency.
+  function refreshCurrencyDisplays(){
+    const sym = currencySymbol();
+    document.getElementById('budgetExactInput').placeholder = `${sym}0.00`;
+    document.getElementById('exactInput').placeholder = `${sym}0.00 (optional)`;
+    document.getElementById('jarAmount').placeholder = `${sym}0.00 (optional)`;
+    document.getElementById('fixedAmount').placeholder = `${sym}0.00`;
+  }
+
+  function rerenderEverything(){
+    refreshCurrencyDisplays();
+    renderToday();
+    renderBars();
+    renderBudgetScreen();
+    renderJar();
+  }
+
+  // =========================================================
+  // SHARED: one toast, pinned above the nav (not inside a scrolling screen)
+  // =========================================================
+  function showToast(message){
+    const toast = document.getElementById('appToast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.classList.remove('show'); toastTimer = null; }, 2400);
+  }
+
+  // =========================================================
+  // SOUND & TOUCH — everything is synthesized with Web Audio (no audio
+  // files), and nothing starts until the person taps something.
+  // =========================================================
+  const TONES = { log:261.63, park:196.00, release:329.63, keep:293.66, budget:246.94, soft:392.00, breathe:174.61 };
+
+  function getAudioCtx(){
+    if(!model.settings.sound) return null;
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return null;
+      if(!audioCtx) audioCtx = new AC();
+      if(audioCtx.state === 'suspended' && typeof audioCtx.resume === 'function') audioCtx.resume();
+      return audioCtx;
+    }catch(err){
+      return null;
+    }
+  }
+
+  // A soft singing-bowl strike: a few inharmonic partials (bowls ring at
+  // roughly 1 : 2.7 : 5.2 times their base pitch), each a slightly detuned
+  // pair so the tone gently beats, with a quick attack and a long decay.
+  function playBowl(freq){
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    try{
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.16;
+      master.connect(ctx.destination);
+      [[1, 1, 3.6], [2.7, 0.45, 2.4], [5.2, 0.2, 1.4]].forEach(([ratio, level, dur]) => {
+        [0, 1.3].forEach(beat => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq * ratio + beat;
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.linearRampToValueAtTime(level * 0.5, now + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          osc.connect(gain);
+          gain.connect(master);
+          osc.start(now);
+          osc.stop(now + dur + 0.05);
+        });
+      });
+      setTimeout(() => { try{ master.disconnect(); }catch(e){} }, 4200);
+    }catch(err){
+      // Sound is a nicety — it must never break the app.
+    }
+  }
+
+  // Looping ocean: brown noise (deep, wave-like rumble) whose volume and
+  // brightness swell together on a 10-second cycle that peaks at the end of
+  // the in-breath, matching the breathing guide.
+  function startOcean(){
+    const ctx = getAudioCtx();
+    if(!ctx) return null;
+    try{
+      const rate = ctx.sampleRate;
+      const len = Math.floor(rate * 6);
+      const fade = Math.floor(rate * 0.4);
+      const buffer = ctx.createBuffer(1, len, rate);
+      const data = buffer.getChannelData(0);
+      let last = 0;
+      for(let i = 0; i < len; i++){
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.5;
+      }
+      // Blend the start toward the tail so the loop point doesn't click.
+      for(let i = 0; i < fade; i++){
+        const t = i / fade;
+        data[i] = data[i] * t + data[len - fade + i] * (1 - t);
+      }
+
+      const now = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.loopStart = 0;
+      src.loopEnd = (len - fade) / rate;
+
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 500;
+      lowpass.Q.value = 0.7;
+
+      const swell = ctx.createGain();
+      swell.gain.value = 0.07;
+
+      const lfo = ctx.createOscillator();
+      try{
+        // -cos: quietest at the start of the cycle, loudest 5 seconds in.
+        lfo.setPeriodicWave(ctx.createPeriodicWave(new Float32Array([0, -1]), new Float32Array([0, 0])));
+      }catch(e){ /* falls back to a plain sine */ }
+      lfo.frequency.value = 0.1;
+      const volDepth = ctx.createGain();
+      volDepth.gain.value = 0.05;
+      const toneDepth = ctx.createGain();
+      toneDepth.gain.value = 250;
+      lfo.connect(volDepth);
+      volDepth.connect(swell.gain);
+      lfo.connect(toneDepth);
+      toneDepth.connect(lowpass.frequency);
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0, now);
+      master.gain.linearRampToValueAtTime(1, now + 1.5);
+
+      src.connect(lowpass);
+      lowpass.connect(swell);
+      swell.connect(master);
+      master.connect(ctx.destination);
+      src.start(now);
+      lfo.start(now);
+
+      return {
+        stop(){
+          try{
+            const t = ctx.currentTime;
+            master.gain.cancelScheduledValues(t);
+            master.gain.setValueAtTime(master.gain.value, t);
+            master.gain.linearRampToValueAtTime(0, t + 1);
+            src.stop(t + 1.1);
+            lfo.stop(t + 1.1);
+            setTimeout(() => { try{ master.disconnect(); }catch(e){} }, 1300);
+          }catch(err){}
+        }
+      };
+    }catch(err){
+      return null;
+    }
+  }
+
+  function stopOcean(){
+    if(oceanHandle){ oceanHandle.stop(); oceanHandle = null; }
+  }
+
+  // Vibration works on most Android browsers; iOS Safari ignores it.
+  function haptic(pattern){
+    if(!model.settings.sound) return;
+    try{
+      if(typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern);
+    }catch(err){}
+  }
+
+  function feedback(kind){
+    if(!model.settings.sound) return;
+    playBowl(TONES[kind] || TONES.log);
+    haptic(kind === 'release' ? [8, 40, 8] : 10);
+  }
+
+  function renderSoundSwitch(){
+    document.getElementById('soundSwitch').setAttribute('aria-checked', model.settings.sound ? 'true' : 'false');
+  }
+
+  function updateBreatheSoundBtn(){
+    const btn = document.getElementById('breatheSoundBtn');
+    btn.textContent = model.settings.sound ? 'Sound on' : 'Sound off';
+    btn.setAttribute('aria-pressed', model.settings.sound ? 'true' : 'false');
+  }
+
+  function setSound(on){
+    model.settings.sound = on;
+    persist();
+    renderSoundSwitch();
+    updateBreatheSoundBtn();
+    const breathing = document.getElementById('breatheOverlay').classList.contains('open');
+    if(on){
+      feedback('soft');
+      if(breathing && !oceanHandle) oceanHandle = startOcean();
+    } else {
+      stopOcean();
+    }
+  }
+
+  // =========================================================
+  // BREATHING EXERCISE
+  // =========================================================
+  function openBreather(){
+    const overlay = document.getElementById('breatheOverlay');
+    overlay.classList.remove('running');
+    void overlay.offsetWidth;                 // restart the CSS cycle in step with the audio swell
+    overlay.classList.add('open');
+    overlay.classList.add('running');
+    overlay.setAttribute('aria-hidden', 'false');
+    updateBreatheSoundBtn();
+    stopOcean();
+    oceanHandle = startOcean();
+    feedback('breathe');
+    const done = document.getElementById('breatheDoneBtn');
+    if(done.focus) done.focus();
+  }
+
+  function closeBreather(){
+    const overlay = document.getElementById('breatheOverlay');
+    overlay.classList.remove('open');
+    overlay.classList.remove('running');
+    overlay.setAttribute('aria-hidden', 'true');
+    stopOcean();
+  }
+
+  // =========================================================
+  // SAFE TO SPEND — fixed costs set aside before the orb is judged
+  // =========================================================
+  const FIXED_PRESETS = ['Rent', 'Utilities', 'Phone', 'Subscriptions'];
+
+  function renderFixedPresets(){
+    const row = document.getElementById('fixedPresets');
+    row.innerHTML = '';
+    FIXED_PRESETS.forEach(name => {
+      row.appendChild(h('button', { class:'pill-btn small', type:'button', text:name, on:{ click: () => {
+        document.getElementById('fixedName').value = name;
+        const amt = document.getElementById('fixedAmount');
+        if(amt.focus) amt.focus();
+      } } }));
+    });
+  }
+
+  function renderFixedCosts(){
+    const list = document.getElementById('fixedList');
+    list.innerHTML = '';
+    model.fixedCosts.forEach(c => {
+      list.appendChild(h('div', { class:'fixed-row' },
+        h('span', { class:'fixed-name', text:c.name }),
+        h('span', { class:'fixed-amt num', text:`${formatMoney(c.amount)} ${c.freq}` }),
+        h('button', { class:'icon-btn', type:'button', 'aria-label':`Remove ${c.name}`, text:'\u00d7', on:{ click: () => removeFixedCost(c.id) } })
+      ));
+    });
+    const n = model.fixedCosts.length;
+    document.getElementById('fixedHint').textContent = n ? `${n} set aside` : 'Nothing set aside';
+    document.querySelectorAll('.freq-btn').forEach(b => b.classList.toggle('selected', b.dataset.freq === fixedFreq));
+  }
+
+  function setFixedFreq(freq){
+    fixedFreq = freq === 'weekly' ? 'weekly' : 'monthly';
+    renderFixedCosts();
+  }
+
+  function fixedMessage(text){ document.getElementById('fixedMsg').textContent = text; }
+
+  function afterFixedCostsChanged(){
+    persist();
+    renderFixedCosts();
+    renderCurrentBudgetSummary();
+    renderToday();
+    renderBars();
+  }
+
+  function addFixedCost(){
+    const nameEl = document.getElementById('fixedName');
+    const amtEl = document.getElementById('fixedAmount');
+    const name = cleanText(nameEl.value, 40);
+    const amount = parseAmount(amtEl.value);
+    if(!name){ fixedMessage('Give it a name first, like Rent.'); return; }
+    if(!isPosNum(amount)){ fixedMessage('Enter an amount above zero.'); return; }
+    model.fixedCosts.push({ id:newId(), name, amount, freq:fixedFreq });
+    nameEl.value = '';
+    amtEl.value = '';
+    afterFixedCostsChanged();
+    feedback('soft');
+    fixedMessage(`Set aside. The orb now reflects what's left after ${name}.`);
+  }
+
+  function removeFixedCost(id){
+    const before = model.fixedCosts.length;
+    model.fixedCosts = model.fixedCosts.filter(c => c.id !== id);
+    if(model.fixedCosts.length === before) return;
+    afterFixedCostsChanged();
+    fixedMessage('Removed. That money is back in your safe-to-spend.');
+  }
+
+  // =========================================================
+  // COOLING-OFF JAR
+  // =========================================================
+  const PEBBLE_SLOTS = [[46,124,12],[72,126,11],[98,124,12],[118,126,10],[60,104,11],[86,106,12],[108,106,10],[74,86,10],[96,88,9]];
+
+  function jarReadyAt(item){ return new Date(item.parkedAt).getTime() + JAR_MS; }
+  function getJarParked(){ return model.jar.filter(j => j.status === 'parked'); }
+  function getJarReady(){ const now = Date.now(); return getJarParked().filter(j => jarReadyAt(j) <= now); }
+
+  function formatReadyIn(ms){
+    const mins = Math.ceil(ms / 60000);
+    if(mins < 60) return `Ready in ${Math.max(mins, 1)} min`;
+    return `Ready in ${Math.ceil(mins / 60)}h`;
+  }
+
+  function updateJarIndicators(){
+    const n = getJarReady().length;
+    document.getElementById('jarDot').classList.toggle('show', n > 0);
+    const nudge = document.getElementById('jarNudge');
+    nudge.classList.toggle('show', n > 0);
+    nudge.textContent = n === 1 ? 'Something in your jar is ready to look at' : `${n} things in your jar are ready to look at`;
+  }
+
+  function renderJarVisual(parked, now){
+    const pebbles = parked.slice(0, PEBBLE_SLOTS.length).map((j, i) => {
+      const slot = PEBBLE_SLOTS[i];
+      const ready = jarReadyAt(j) <= now;
+      return `<circle class="pebble${ready ? ' ready' : ''}" cx="${slot[0]}" cy="${slot[1]}" r="${slot[2]}" style="animation-delay:${(i * 0.45).toFixed(2)}s"/>`;
+    }).join('');
+    document.getElementById('jarStage').innerHTML =
+      `<svg class="jar-svg" viewBox="0 0 160 150" role="img" aria-label="Jar holding ${parked.length} parked ${plural(parked.length, 'item', 'items')}">` +
+      `<rect class="jar-lid" x="52" y="6" width="56" height="12" rx="4"/>` +
+      `<path class="jar-body" d="M56 22 L104 22 L104 34 C122 40 134 50 134 66 L134 124 Q134 138 120 138 L40 138 Q26 138 26 124 L26 66 C26 50 38 40 56 34 Z"/>` +
+      pebbles + `</svg>`;
+  }
+
+  function renderJar(){
+    const now = Date.now();
+    const parked = getJarParked().sort((a, b) => jarReadyAt(a) - jarReadyAt(b));
+    const ready = parked.filter(j => jarReadyAt(j) <= now);
+    const waiting = parked.filter(j => jarReadyAt(j) > now);
+    renderJarVisual(parked, now);
+
+    const readyBox = document.getElementById('jarReady');
+    readyBox.innerHTML = '';
+    ready.forEach(j => {
+      readyBox.appendChild(h('div', { class:'jar-card' },
+        h('div', { class:'jar-card-name', text:j.name }),
+        h('div', { class:'jar-card-q', text:"Still something you'd love, or ready to let it go?" }),
+        (jarNumbersShown && j.amount) ? h('div', { class:'jar-card-amt', text:formatMoney(j.amount) }) : null,
+        h('div', { class:'btn-row' },
+          h('button', { class:'pill-btn solid', type:'button', 'data-act':'keep', text:'Still love it', on:{ click: () => resolveJarItem(j.id, 'kept') } }),
+          h('button', { class:'pill-btn', type:'button', 'data-act':'release', text:'Let it go', on:{ click: () => resolveJarItem(j.id, 'released') } })
+        )
+      ));
+    });
+
+    const list = document.getElementById('jarList');
+    list.innerHTML = '';
+    if(parked.length === 0){
+      list.appendChild(h('div', { class:'jar-empty', text:'Nothing parked. When you feel the pull to buy something, park it here first.' }));
+    }
+    waiting.forEach(j => {
+      const pct = Math.min(100, Math.max(0, ((now - new Date(j.parkedAt).getTime()) / JAR_MS) * 100));
+      const fill = h('span');
+      fill.style.width = pct.toFixed(1) + '%';
+      list.appendChild(h('div', { class:'jar-item' },
+        h('div', { class:'jar-item-top' },
+          h('span', { class:'jar-item-name', text:j.name }),
+          h('span', { class:'jar-item-time', text:formatReadyIn(jarReadyAt(j) - now) })
+        ),
+        h('div', { class:'jar-bar' }, fill),
+        h('div', { class:'jar-item-extra' },
+          h('span', { class:'num', text:(jarNumbersShown && j.amount) ? formatMoney(j.amount) : '' }),
+          h('button', { class:'text-toggle', type:'button', text:'Let it go now', on:{ click: () => resolveJarItem(j.id, 'released') } })
+        )
+      ));
+    });
+
+    const released = model.jar.filter(j => j.status === 'released');
+    const tally = document.getElementById('jarTally');
+    if(released.length){
+      const kept = released.reduce((sum, j) => sum + (j.amount || 0), 0);
+      let text = `You've let go of ${released.length} ${plural(released.length, 'thing', 'things')}.`;
+      if(jarNumbersShown && kept > 0) text += ` About ${formatMoney(kept)} stayed with you.`;
+      tally.textContent = text;
+    } else {
+      tally.textContent = '';
+    }
+
+    document.getElementById('jarNumbersToggle').textContent = jarNumbersShown ? 'Hide the numbers' : 'Show the numbers';
+    updateJarIndicators();
+  }
+
+  function toggleJarNumbers(){
+    jarNumbersShown = !jarNumbersShown;
+    renderJar();
+  }
+
+  function evaluateJarReady(){
+    const ok = cleanText(document.getElementById('jarName').value, 60).length > 0;
+    document.getElementById('jarParkBtn').classList.toggle('ready', ok);
+  }
+
+  function parkJarItem(){
+    const nameEl = document.getElementById('jarName');
+    const amtEl = document.getElementById('jarAmount');
+    const name = cleanText(nameEl.value, 60);
+    if(!name) return;
+    const amount = parseAmount(amtEl.value);
+    model.jar.push({
+      id: newId(), name, amount: isPosNum(amount) ? amount : null,
+      parkedAt: new Date().toISOString(), status: 'parked', resolvedAt: null
+    });
+    persist();
+    nameEl.value = '';
+    amtEl.value = '';
+    evaluateJarReady();
+    feedback('park');
+    showToast("Parked. We'll check back in 48 hours.");
+    renderJar();
+  }
+
+  function resolveJarItem(id, status){
+    const item = model.jar.find(j => j.id === id && j.status === 'parked');
+    if(!item) return;
+    item.status = status;
+    item.resolvedAt = new Date().toISOString();
+    // keep the history tidy: only the 200 most recent resolved items are remembered
+    const resolved = model.jar.filter(j => j.status !== 'parked');
+    if(resolved.length > 200){
+      const drop = new Set(resolved.sort((a, b) => new Date(a.resolvedAt) - new Date(b.resolvedAt)).slice(0, resolved.length - 200).map(j => j.id));
+      model.jar = model.jar.filter(j => !drop.has(j.id));
+    }
+    persist();
+    feedback(status === 'kept' ? 'keep' : 'release');
+    showToast(status === 'kept'
+      ? "Then it's yours to enjoy. Log it whenever you buy it."
+      : 'Let go. That money stays with you.');
+    renderJar();
+  }
+
+  // =========================================================
+  // BACKUP & RESTORE — private, on-device, no upload
+  // =========================================================
+  function backupMessage(text){ document.getElementById('backupMsg').textContent = text; }
+
+  function buildBackupText(){
+    return JSON.stringify({ app:'steady', version:2, exportedAt:new Date().toISOString(), data:serializeState() }, null, 2);
+  }
+
+  function showBackupText(text){
+    const ta = document.getElementById('backupText');
+    ta.value = text;
+    ta.classList.add('open');
+    if(ta.focus) ta.focus();
+    if(ta.select) ta.select();
+  }
+
+  function downloadBackup(){
+    try{
+      const blob = new Blob([buildBackupText()], { type:'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'steady-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      backupMessage('Download started. If nothing arrives, your browser may be blocking it. Use Copy as text instead.');
+    }catch(err){
+      showBackupText(buildBackupText());
+      backupMessage("Couldn't start a download here. Copy the text below instead.");
+    }
+  }
+
+  async function copyBackupText(){
+    const text = buildBackupText();
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+        backupMessage('Copied. Keep it somewhere safe, or paste it into Restore on another device.');
+        return;
+      }
+    }catch(err){
+      // fall through to the manual option
+    }
+    showBackupText(text);
+    backupMessage("Couldn't copy automatically. Select the text below and copy it.");
+  }
+
+  function hideRestoreConfirm(){ document.getElementById('restoreConfirm').classList.remove('open'); }
+
+  function prepareRestore(text){
+    pendingRestore = null;
+    hideRestoreConfirm();
+    if(!text || !text.trim()){ backupMessage('Choose a file or paste backup text first.'); return; }
+    try{
+      if(text.length > 5 * 1024 * 1024) throw new Error('too large');
+      const parsed = JSON.parse(text);
+      if(!parsed || parsed.app !== 'steady' || typeof parsed.data !== 'object' || parsed.data === null) throw new Error('not a Steady backup');
+      pendingRestore = sanitizeState(parsed.data);
+      const p = pendingRestore;
+      const inJar = p.jar.filter(j => j.status === 'parked').length;
+      document.getElementById('restoreSummary').textContent =
+        `This backup has ${p.entries.length} logged ${plural(p.entries.length, 'item', 'items')}, ` +
+        `${p.budgetHistory.length} budget ${plural(p.budgetHistory.length, 'change', 'changes')}, ` +
+        `${p.fixedCosts.length} fixed ${plural(p.fixedCosts.length, 'cost', 'costs')} and ` +
+        `${inJar} ${plural(inJar, 'item', 'items')} in the jar. Replace what's on this device with it?`;
+      document.getElementById('restoreConfirm').classList.add('open');
+      backupMessage('');
+    }catch(err){
+      backupMessage("That doesn't look like a Steady backup. Check the file or text and try again.");
+    }
+  }
+
+  function applyRestore(){
+    if(!pendingRestore) return;
+    applyState(pendingRestore);
+    pendingRestore = null;
+    budgetMode = 'add';
+    jarNumbersShown = false;
+    hideRestoreConfirm();
+    document.getElementById('restoreText').value = '';
+    persist();
+    rerenderEverything();
+    showToast('Backup restored.');
+    backupMessage('Restored. Everything on this device now matches the backup.');
+  }
+
+  function cancelRestore(){
+    pendingRestore = null;
+    hideRestoreConfirm();
+    backupMessage('Restore cancelled. Nothing was changed.');
+  }
+
+  function readRestoreFile(e){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    if(file.size > 5 * 1024 * 1024){ backupMessage('That file is too large to be a Steady backup.'); e.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = () => prepareRestore(String(reader.result || ''));
+    reader.onerror = () => backupMessage("Couldn't read that file.");
+    reader.readAsText(file);
+    e.target.value = '';   // lets the same file be chosen again
+  }
+
+  // =========================================================
+  // ANIMATED TUTORIAL
+  // The track is N slides wide (N x 100%), each slide 1/N of the track, so
+  // moving to slide i shifts the track left by i * (100 / N) percent.
+  // =========================================================
+  function renderTutorialDots(){
+    const wrap = document.getElementById('tutorialDots');
+    wrap.innerHTML = '';
+    for(let i = 0; i < TUTORIAL_SLIDE_COUNT; i++){
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'tutorial-dot' + (i === tutorialIndex ? ' active' : '');
+      dot.setAttribute('aria-label', `Go to step ${i + 1}`);
+      dot.addEventListener('click', () => goToTutorialSlide(i));
+      wrap.appendChild(dot);
+    }
+  }
+
+  function updateTutorialTrack(){
+    document.getElementById('tutorialTrack').style.transform = `translateX(-${tutorialIndex * (100 / TUTORIAL_SLIDE_COUNT)}%)`;
+    document.getElementById('tutorialNextBtn').textContent =
+      (tutorialIndex === TUTORIAL_SLIDE_COUNT - 1) ? "Let's go" : 'Next';
+  }
+
+  function goToTutorialSlide(i){
+    tutorialIndex = Math.max(0, Math.min(TUTORIAL_SLIDE_COUNT - 1, i));
+    updateTutorialTrack();
+    renderTutorialDots();
+  }
+
+  function nextTutorialStep(){
+    if(tutorialIndex >= TUTORIAL_SLIDE_COUNT - 1){ closeTutorial(); return; }
+    goToTutorialSlide(tutorialIndex + 1);
+  }
+
+  function openTutorial(){
+    tutorialIndex = 0;
+    updateTutorialTrack();
+    renderTutorialDots();
+    document.getElementById('tutorialOverlay').classList.add('open');
+  }
+
+  function closeTutorial(){
+    document.getElementById('tutorialOverlay').classList.remove('open');
+    markTutorialSeen();
+  }
+
+  async function hasTutorialBeenSeen(){
+    try{
+      if(!(await checkStorageAvailable())) return false;
+      const res = await window.storage.get(TUTORIAL_SEEN_KEY, false);
+      return !!(res && res.value === 'true');
+    }catch(err){
+      return false;
+    }
+  }
+
+  async function markTutorialSeen(){
+    try{
+      if(!(await checkStorageAvailable())) return;
+      await window.storage.set(TUTORIAL_SEEN_KEY, 'true', false);
+    }catch(err){
+      // Best-effort — worst case, the tutorial shows again next time.
+    }
+  }
+
+  // =========================================================
+  // NAVIGATION
+  // =========================================================
+  function showScreen(name){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
+    if(name === 'today') renderToday();
+    if(name === 'reflect') renderBars();
+    if(name === 'budget') renderBudgetScreen();
+    if(name === 'jar') renderJar();
+  }
+
+  // =========================================================
+  // WIRE UP
+  // =========================================================
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => showScreen(btn.dataset.screen));
+  });
+
+  document.getElementById('orbBtn').addEventListener('click', toggleNumber);
+  document.getElementById('orbBtn').addEventListener('focus', () => {
+    let visible = true;
+    try{ visible = document.getElementById('orbBtn').matches(':focus-visible'); }catch(e){}
+    document.getElementById('orbStage').classList.toggle('orb-focused', visible);
+  });
+  document.getElementById('orbBtn').addEventListener('blur', () => {
+    document.getElementById('orbStage').classList.remove('orb-focused');
+  });
+  document.getElementById('revealBtn').addEventListener('click', toggleNumber);
+  document.getElementById('goLogBtn').addEventListener('click', () => showScreen('log'));
+  document.getElementById('saveBtn').addEventListener('click', saveEntry);
+
+  document.getElementById('detailsToggle').addEventListener('click', toggleWeekDetails);
+  document.getElementById('breathBtn').addEventListener('click', openBreather);
+
+  document.getElementById('stepDown').addEventListener('click', () => adjustStepper(-10));
+  document.getElementById('stepUp').addEventListener('click', () => adjustStepper(10));
+
+  document.getElementById('budgetExactToggle').addEventListener('click', () => {
+    budgetExactOpen = !budgetExactOpen;
+    document.getElementById('budgetExactWrap').classList.toggle('open', budgetExactOpen);
+    document.getElementById('budgetExactToggle').textContent =
+      budgetExactOpen ? 'Use the nudge buttons instead' : "I'd rather type the exact number";
+  });
+
+  document.getElementById('budgetExactInput').addEventListener('input', (e) => {
+    const val = parseAmount(e.target.value);
+    if(!isNaN(val) && val > 0){
+      budgetDraftAmount = val;
+      document.getElementById('stepperValue').textContent = formatMoney(val);
+    }
+  });
+
+  document.getElementById('saveBudgetBtn').addEventListener('click', saveBudget);
+  document.getElementById('resetDataBtn').addEventListener('click', showResetConfirm);
+  document.getElementById('resetCancelBtn').addEventListener('click', hideResetConfirm);
+  document.getElementById('resetConfirmBtn').addEventListener('click', resetAllData);
+
+  document.getElementById('helpBtn').addEventListener('click', openTutorial);
+  document.getElementById('replayTutorialBtn').addEventListener('click', openTutorial);
+  document.getElementById('tutorialSkipBtn').addEventListener('click', closeTutorial);
+  document.getElementById('tutorialNextBtn').addEventListener('click', nextTutorialStep);
+
+  // breathing, sound
+  document.getElementById('breatherBtn').addEventListener('click', openBreather);
+  document.getElementById('breatheDoneBtn').addEventListener('click', closeBreather);
+  document.getElementById('breatheSoundBtn').addEventListener('click', () => setSound(!model.settings.sound));
+  document.getElementById('soundSwitch').addEventListener('click', () => setSound(!model.settings.sound));
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && document.getElementById('breatheOverlay').classList.contains('open')) closeBreather();
+  });
+  document.addEventListener('visibilitychange', () => {
+    // never leave ambient audio running in a background tab
+    if(document.hidden) closeBreather();
+  });
+
+  // jar
+  document.getElementById('jarNudge').addEventListener('click', () => showScreen('jar'));
+  document.getElementById('logToJarBtn').addEventListener('click', () => showScreen('jar'));
+  document.getElementById('jarParkBtn').addEventListener('click', parkJarItem);
+  document.getElementById('jarName').addEventListener('input', evaluateJarReady);
+  document.getElementById('jarName').addEventListener('keydown', (e) => { if(e.key === 'Enter') parkJarItem(); });
+  document.getElementById('jarNumbersToggle').addEventListener('click', toggleJarNumbers);
+
+  // fixed costs
+  document.querySelectorAll('.freq-btn').forEach(btn => {
+    btn.addEventListener('click', () => setFixedFreq(btn.dataset.freq));
+  });
+  document.getElementById('fixedAddBtn').addEventListener('click', addFixedCost);
+
+  // backup & restore
+  document.getElementById('backupDownloadBtn').addEventListener('click', downloadBackup);
+  document.getElementById('backupCopyBtn').addEventListener('click', copyBackupText);
+  document.getElementById('restoreFileBtn').addEventListener('click', () => document.getElementById('restoreFile').click());
+  document.getElementById('restoreFile').addEventListener('change', readRestoreFile);
+  document.getElementById('restoreTextBtn').addEventListener('click', () => prepareRestore(document.getElementById('restoreText').value));
+  document.getElementById('restoreApplyBtn').addEventListener('click', applyRestore);
+  document.getElementById('restoreCancelBtn').addEventListener('click', cancelRestore);
+
+  // =========================================================
+  // INIT
+  // =========================================================
+  async function init(){
+    renderCategories();
+    // Render immediately with defaults so the UI is never blank...
+    renderToday();
+    renderBars();
+    renderBudgetScreen();
+    // ...then load any saved state and re-render with the real data.
+    await loadState();
+    budgetDraftAmount = computeDefaultDraft();
+    renderToday();
+    renderBars();
+    renderBudgetScreen();
+
+    renderFixedPresets();
+    renderSoundSwitch();
+    renderJar();
+    // Keep the jar's countdowns and "ready" nudges fresh without a reload.
+    if(!jarTimer){
+      jarTimer = setInterval(() => {
+        updateJarIndicators();
+        if(document.getElementById('screen-jar').classList.contains('active')) renderJar();
+      }, 30000);
+    }
+
+    // First-time visitors get the animated walkthrough automatically;
+    // everyone else can replay it anytime via the ? icon or Budget tab.
+    const seen = await hasTutorialBeenSeen();
+    if(!seen) openTutorial();
+  }
+  init();
+
+})();
+</script>
+
+<!-- Liquid filter: blur, then sharpen the alpha so nearby shapes bridge into one body. -->
+<svg aria-hidden="true" focusable="false" style="visibility:hidden;position:absolute" width="0" height="0">
+  <filter id="goo" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -6" result="goo"/>
+    <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+  </filter>
+</svg>
+
+</body>
+</html>
